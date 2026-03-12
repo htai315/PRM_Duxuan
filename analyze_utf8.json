@@ -1,0 +1,22 @@
+﻿[
+    {
+        "problemMessage":  "Undefined class \u0027PlanDay\u0027.",
+        "file":  "C:\\Users\\Chung\\StudioProjects\\du_xuan\\lib\\views\\plan_detail\\day_detail_page.dart",
+        "startLine":  75
+    },
+    {
+        "problemMessage":  "The argument type \u0027Plan?\u0027 can\u0027t be assigned to the parameter type \u0027Plan\u0027. ",
+        "file":  "C:\\Users\\Chung\\StudioProjects\\du_xuan\\lib\\views\\plan_detail\\tabs\\day_list_tab.dart",
+        "startLine":  69
+    },
+    {
+        "problemMessage":  "The declaration \u0027_isFormValid\u0027 isn\u0027t referenced.",
+        "file":  "C:\\Users\\Chung\\StudioProjects\\du_xuan\\lib\\views\\itinerary\\activity_form_page.dart",
+        "startLine":  334
+    },
+    {
+        "problemMessage":  "The declaration \u0027_googleButton\u0027 isn\u0027t referenced.",
+        "file":  "C:\\Users\\Chung\\StudioProjects\\du_xuan\\lib\\views\\login\\login_page.dart",
+        "startLine":  349
+    }
+]
