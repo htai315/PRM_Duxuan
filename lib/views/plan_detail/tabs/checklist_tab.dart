@@ -7,12 +7,14 @@ class ChecklistTab extends StatelessWidget {
   final ChecklistViewModel checklistVM;
   final int planId;
   final String planName;
+  final bool readOnly;
 
   const ChecklistTab({
     super.key,
     required this.checklistVM,
     required this.planId,
     required this.planName,
+    this.readOnly = false,
   });
 
   @override
@@ -21,7 +23,8 @@ class ChecklistTab extends StatelessWidget {
       viewModel: checklistVM,
       planId: planId,
       planName: planName,
-      embeddedMode: true,  // không hiện AppBar riêng
+      embeddedMode: true, // không hiện AppBar riêng
+      readOnly: readOnly,
     );
   }
 }

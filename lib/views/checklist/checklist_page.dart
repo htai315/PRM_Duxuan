@@ -12,6 +12,7 @@ class ChecklistPage extends StatefulWidget {
   final int planId;
   final String planName;
   final bool embeddedMode;
+  final bool readOnly;
 
   const ChecklistPage({
     super.key,
@@ -19,6 +20,7 @@ class ChecklistPage extends StatefulWidget {
     required this.planId,
     required this.planName,
     this.embeddedMode = false,
+    this.readOnly = false,
   });
 
   @override
@@ -54,7 +56,7 @@ class _ChecklistPageState extends State<ChecklistPage> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      floatingActionButton: _buildFab(),
+      floatingActionButton: widget.readOnly ? null : _buildFab(),
       body: widget.embeddedMode
           ? content
           : Container(
@@ -125,7 +127,7 @@ class _ChecklistPageState extends State<ChecklistPage> {
           Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: () => _openAiSuggestion(),
+              onTap: widget.readOnly ? null : () => _openAiSuggestion(),
               borderRadius: BorderRadius.circular(999),
               child: Container(
                 padding: const EdgeInsets.all(10),
@@ -197,7 +199,7 @@ class _ChecklistPageState extends State<ChecklistPage> {
           Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: () => _openAiSuggestion(),
+              onTap: widget.readOnly ? null : () => _openAiSuggestion(),
               borderRadius: BorderRadius.circular(20),
               child: Container(
                 padding: const EdgeInsets.symmetric(
@@ -359,28 +361,36 @@ class _ChecklistPageState extends State<ChecklistPage> {
               style: AppTextStyles.bodySmall,
             ),
             const SizedBox(height: 20),
-            TextButton.icon(
-              onPressed: _showAddSheet,
-              style: TextButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 11,
+            if (widget.readOnly)
+              Text(
+                'Kế hoạch đã hoàn thành, checklist ở chế độ chỉ xem.',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.textLight,
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(999),
+              )
+            else
+              TextButton.icon(
+                onPressed: _showAddSheet,
+                style: TextButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 11,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: Text(
+                  'Thêm vật dụng',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: Text(
-                'Thêm vật dụng',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
           ],
         ),
       );
@@ -477,7 +487,9 @@ class _ChecklistPageState extends State<ChecklistPage> {
   Widget _itemCard(ChecklistItem item, Color catColor) {
     return Dismissible(
       key: ValueKey(item.id),
-      direction: DismissDirection.endToStart,
+      direction: widget.readOnly
+          ? DismissDirection.none
+          : DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
         margin: const EdgeInsets.only(bottom: 6),
@@ -488,11 +500,12 @@ class _ChecklistPageState extends State<ChecklistPage> {
         ),
         child: const Icon(Icons.delete_rounded, color: AppColors.error),
       ),
-      confirmDismiss: (_) => _confirmDelete(item),
+      confirmDismiss: (_) =>
+          widget.readOnly ? Future.value(false) : _confirmDelete(item),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => _showEditSheet(item),
+          onTap: widget.readOnly ? null : () => _showEditSheet(item),
           borderRadius: BorderRadius.circular(14),
           child: Container(
             margin: const EdgeInsets.only(bottom: 6),
@@ -517,7 +530,9 @@ class _ChecklistPageState extends State<ChecklistPage> {
               children: [
                 // Checkbox with category color
                 GestureDetector(
-                  onTap: () => widget.viewModel.togglePacked(item.id),
+                  onTap: widget.readOnly
+                      ? null
+                      : () => widget.viewModel.togglePacked(item.id),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     width: 28,
@@ -607,6 +622,10 @@ class _ChecklistPageState extends State<ChecklistPage> {
   // ═══════════════════════════════════════════════════════
 
   void _showAddSheet() {
+    if (widget.readOnly) {
+      return;
+    }
+
     final nameCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
     var quantity = 1;
@@ -648,6 +667,10 @@ class _ChecklistPageState extends State<ChecklistPage> {
   }
 
   void _showEditSheet(ChecklistItem item) {
+    if (widget.readOnly) {
+      return;
+    }
+
     final nameCtrl = TextEditingController(text: item.name);
     final noteCtrl = TextEditingController(text: item.note ?? '');
     var quantity = item.quantity;
@@ -991,6 +1014,10 @@ class _ChecklistPageState extends State<ChecklistPage> {
   }
 
   Future<bool> _confirmDelete(ChecklistItem item) async {
+    if (widget.readOnly) {
+      return false;
+    }
+
     final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1027,6 +1054,10 @@ class _ChecklistPageState extends State<ChecklistPage> {
   }
 
   Future<void> _openAiSuggestion() async {
+    if (widget.readOnly) {
+      return;
+    }
+
     if (!mounted) return;
     final suggestionVM = buildSuggestionVM();
     SuggestionBottomSheet.show(

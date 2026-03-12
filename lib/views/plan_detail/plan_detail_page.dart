@@ -115,6 +115,7 @@ class _PlanDetailPageState extends State<PlanDetailPage>
                           checklistVM: _checklistVM,
                           planId: widget.planId,
                           planName: plan.name,
+                          readOnly: widget.viewModel.isViewMode,
                         ),
                         LocationsTab(
                           planId: widget.planId,

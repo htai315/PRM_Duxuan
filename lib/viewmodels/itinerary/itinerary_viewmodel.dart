@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:du_xuan/core/enums/activity_status.dart';
 import 'package:du_xuan/core/enums/plan_status.dart';
 import 'package:du_xuan/data/interfaces/repositories/i_activity_repository.dart';
 import 'package:du_xuan/data/interfaces/repositories/i_plan_repository.dart';
@@ -62,6 +63,44 @@ class ItineraryViewModel extends ChangeNotifier {
       _plan!.endDate.year, _plan!.endDate.month, _plan!.endDate.day,
     );
     return today.isAfter(end);
+  }
+
+  /// Plan đang diễn ra (hôm nay nằm trong khoảng startDate..endDate)
+  bool get isOngoing {
+    if (_plan == null) return false;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final start = DateTime(
+      _plan!.startDate.year,
+      _plan!.startDate.month,
+      _plan!.startDate.day,
+    );
+    final end = DateTime(
+      _plan!.endDate.year,
+      _plan!.endDate.month,
+      _plan!.endDate.day,
+    );
+    return !today.isBefore(start) && !today.isAfter(end);
+  }
+
+  /// Mọi ngày đều có activity và tất cả activity đều đã done.
+  bool get isAllDaysCompleted {
+    if (_plan == null || days.isEmpty) return false;
+
+    for (final day in days) {
+      final activities = _allActivitiesByDay[day.id] ?? const <Activity>[];
+      if (activities.isEmpty) return false;
+      final hasUndone = activities.any((a) => a.status != ActivityStatus.done);
+      if (hasUndone) return false;
+    }
+    return true;
+  }
+
+  /// Có thể đánh dấu completed khi plan đang diễn ra và toàn bộ hoạt động đã xong.
+  bool get canMarkPlanCompleted {
+    if (_plan == null || isViewMode) return false;
+    if (_plan!.status != PlanStatus.active) return false;
+    return isOngoing && isAllDaysCompleted;
   }
 
   // ─── Actions ──────────────────────────────────────────
@@ -166,10 +205,17 @@ class ItineraryViewModel extends ChangeNotifier {
   /// Đánh dấu plan hoàn thành
   Future<bool> markPlanCompleted() async {
     if (_plan == null) return false;
+    if (!canMarkPlanCompleted) {
+      _errorMessage =
+          'Chỉ có thể hoàn thành khi kế hoạch đang diễn ra và mọi hoạt động đều đã xong.';
+      notifyListeners();
+      return false;
+    }
     try {
       final updated = _plan!.copyWith(status: PlanStatus.completed);
       await _planRepo.update(updated);
       _plan = updated;
+      _errorMessage = null;
       notifyListeners();
       return true;
     } catch (e) {

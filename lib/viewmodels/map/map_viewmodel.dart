@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:du_xuan/core/enums/plan_status.dart';
 import 'package:du_xuan/data/implementations/api/geocoding_service.dart';
 import 'package:du_xuan/data/interfaces/repositories/i_activity_repository.dart';
 import 'package:du_xuan/data/interfaces/repositories/i_plan_repository.dart';
+import 'package:du_xuan/domain/entities/plan.dart';
 import 'package:du_xuan/domain/entities/map_marker_data.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -26,17 +28,31 @@ class MapViewModel extends ChangeNotifier {
   List<String> _unresolvedLocations = [];
   bool _isLoading = false;
   String? _errorMessage;
+  int _ongoingPlanCount = 0;
+  bool _hasLoaded = false;
+  int? _lastLoadedUserId;
 
   // ─── Getters ──────────────────────────────────────────
   List<MapMarkerData> get markers => _markers;
   List<String> get unresolvedLocations => _unresolvedLocations;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  bool get hasOngoingPlans => _ongoingPlanCount > 0;
+  int get ongoingPlanCount => _ongoingPlanCount;
+  bool get hasLoaded => _hasLoaded;
 
   // ─── Actions ──────────────────────────────────────────
 
-  /// Load tất cả địa điểm từ mọi kế hoạch của user → geocode → markers
-  Future<void> loadMarkers(int userId) async {
+  /// Load địa điểm từ các kế hoạch đang diễn ra của user → geocode → markers.
+  Future<void> loadMarkers(int userId, {bool force = false}) async {
+    if (userId <= 0) {
+      clear();
+      return;
+    }
+    if (!force && _hasLoaded && _lastLoadedUserId == userId) {
+      return;
+    }
+
     _isLoading = true;
     _errorMessage = null;
     _unresolvedLocations = [];
@@ -44,13 +60,26 @@ class MapViewModel extends ChangeNotifier {
 
     try {
       final plans = await _planRepo.getMyPlans(userId);
+      final ongoingPlans = plans.where(_isPlanOngoing).toList();
+      _ongoingPlanCount = ongoingPlans.length;
+
+      if (ongoingPlans.isEmpty) {
+        _markers = [];
+        _unresolvedLocations = [];
+        _hasLoaded = true;
+        _lastLoadedUserId = userId;
+        _isLoading = false;
+        notifyListeners();
+        return;
+      }
+
       final mergedGroups = <_MarkerGroup>[];
       final unresolvedSet = <String>{};
 
       // Thu thập locationText unique theo key chuẩn hoá trong từng plan.
       final locationBuckets = <String, _LocationBucket>{};
 
-      for (final plan in plans) {
+      for (final plan in ongoingPlans) {
         // Load full plan with days
         final fullPlan = await _planRepo.getById(plan.id);
         if (fullPlan == null) continue;
@@ -93,6 +122,8 @@ class MapViewModel extends ChangeNotifier {
 
       _markers = mergedGroups.map(_toMapMarker).toList();
       _unresolvedLocations = unresolvedSet.toList()..sort();
+      _hasLoaded = true;
+      _lastLoadedUserId = userId;
     } catch (e) {
       _errorMessage = 'Không thể tải dữ liệu bản đồ';
       debugPrint('❌ MapViewModel error: $e');
@@ -100,6 +131,44 @@ class MapViewModel extends ChangeNotifier {
 
     _isLoading = false;
     notifyListeners();
+  }
+
+  void clear() {
+    _markers = [];
+    _unresolvedLocations = [];
+    _errorMessage = null;
+    _isLoading = false;
+    _ongoingPlanCount = 0;
+    _hasLoaded = false;
+    _lastLoadedUserId = null;
+    notifyListeners();
+  }
+
+  void invalidateCache() {
+    _hasLoaded = false;
+    _lastLoadedUserId = null;
+  }
+
+  bool _isPlanOngoing(Plan plan) {
+    // Cho phép hiển thị cả plan đã bấm "hoàn thành" miễn là đang trong khung ngày.
+    if (plan.status == PlanStatus.draft || plan.status == PlanStatus.archived) {
+      return false;
+    }
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final start = DateTime(
+      plan.startDate.year,
+      plan.startDate.month,
+      plan.startDate.day,
+    );
+    final end = DateTime(
+      plan.endDate.year,
+      plan.endDate.month,
+      plan.endDate.day,
+    );
+
+    return !today.isBefore(start) && !today.isAfter(end);
   }
 
   String _normalizeLocation(String location) {

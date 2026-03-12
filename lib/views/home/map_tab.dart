@@ -25,16 +25,10 @@ class _MapTabState extends State<MapTab> {
   MapMarkerData? _selectedMarker;
 
   @override
-  void initState() {
-    super.initState();
-    widget.viewModel.loadMarkers(widget.userId);
-  }
-
-  @override
   void didUpdateWidget(covariant MapTab oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.userId != widget.userId && widget.userId > 0) {
-      widget.viewModel.loadMarkers(widget.userId);
+    if (oldWidget.userId != widget.userId) {
+      _selectedMarker = null;
     }
   }
 
@@ -74,6 +68,12 @@ class _MapTabState extends State<MapTab> {
           listenable: widget.viewModel,
           builder: (context, _) {
             final hasMarkers = widget.viewModel.markers.isNotEmpty;
+            final canShowMap =
+                !widget.viewModel.hasLoaded || widget.viewModel.hasOngoingPlans;
+
+            if (!canShowMap) {
+              return _buildNoOngoingOverlay();
+            }
 
             return Stack(
               children: [
@@ -218,7 +218,8 @@ class _MapTabState extends State<MapTab> {
                     ),
                     _headerActionButton(
                       icon: Icons.refresh_rounded,
-                      onTap: () => widget.viewModel.loadMarkers(widget.userId),
+                      onTap: () =>
+                          widget.viewModel.loadMarkers(widget.userId, force: true),
                     ),
                     const SizedBox(width: 6),
                     _headerActionButton(
@@ -249,6 +250,10 @@ class _MapTabState extends State<MapTab> {
     final error = widget.viewModel.errorMessage;
     if (error != null && error.isNotEmpty) {
       return error;
+    }
+
+    if (widget.viewModel.hasLoaded && !widget.viewModel.hasOngoingPlans) {
+      return 'Không có kế hoạch đang diễn ra để hiển thị bản đồ';
     }
 
     if (markerCount == 0 && unresolvedCount == 0) {
@@ -362,7 +367,8 @@ class _MapTabState extends State<MapTab> {
               ],
               const SizedBox(height: 10),
               TextButton.icon(
-                onPressed: () => widget.viewModel.loadMarkers(widget.userId),
+                onPressed: () =>
+                    widget.viewModel.loadMarkers(widget.userId, force: true),
                 style: TextButton.styleFrom(
                   backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                   foregroundColor: AppColors.primary,
@@ -528,7 +534,10 @@ class _MapTabState extends State<MapTab> {
                       );
 
                       if (!mounted) return;
-                      await widget.viewModel.loadMarkers(widget.userId);
+                      await widget.viewModel.loadMarkers(
+                        widget.userId,
+                        force: true,
+                      );
                       if (!mounted) return;
                       setState(() => _selectedMarker = null);
                     },
@@ -649,6 +658,62 @@ class _MapTabState extends State<MapTab> {
           width: 48,
           height: 42,
           child: Icon(icon, color: AppColors.textMedium, size: 22),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoOngoingOverlay() {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 32),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+        decoration: BoxDecoration(
+          color: AppColors.white.withValues(alpha: 0.95),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.divider.withValues(alpha: 0.85)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.event_busy_rounded,
+                color: AppColors.primary,
+                size: 24,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Không có kế hoạch đang diễn ra',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textDark,
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Bản đồ chỉ hiển thị địa điểm của kế hoạch đang diễn ra.',
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.textLight,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );

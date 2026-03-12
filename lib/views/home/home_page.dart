@@ -55,7 +55,7 @@ class _HomePageState extends State<HomePage> {
     if (index == 2) {
       final userId = widget.viewModel.session?.user.id;
       if (userId != null && userId > 0) {
-        _mapVM.loadMarkers(userId);
+        _mapVM.loadMarkers(userId, force: true);
       }
     }
   }
@@ -221,6 +221,7 @@ class _HomePageState extends State<HomePage> {
     );
     if (result == true && mounted) {
       await _planListVM.loadPlans(userId, refresh: true);
+      _mapVM.invalidateCache();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

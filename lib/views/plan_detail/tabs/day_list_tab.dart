@@ -53,14 +53,18 @@ class DayListTab extends StatelessWidget {
         // Overdue / View mode banners
         final isViewMode = viewModel.isViewMode;
         final isOverdue = viewModel.isOverdue;
+        final canMarkPlanCompleted = viewModel.canMarkPlanCompleted;
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
           children: [
             // Status banners
             if (isViewMode) _buildCompletedBanner(context),
-            if (isOverdue) _buildOverdueBanner(context),
-            if (isViewMode || isOverdue) const SizedBox(height: 12),
+            if (!isViewMode && canMarkPlanCompleted)
+              _buildReadyToCompleteBanner(context),
+            if (!isViewMode && isOverdue) _buildOverdueBanner(),
+            if (isViewMode || canMarkPlanCompleted || isOverdue)
+              const SizedBox(height: 12),
 
             // Day cards
             ...days.map((day) => _dayCard(context, day)),
@@ -396,7 +400,63 @@ class DayListTab extends StatelessWidget {
     );
   }
 
-  Widget _buildOverdueBanner(BuildContext context) {
+  Widget _buildReadyToCompleteBanner(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.success.withValues(alpha: 0.1),
+            AppColors.success.withValues(alpha: 0.04),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.success.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.task_alt_rounded,
+            size: 20,
+            color: AppColors.success,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Tất cả hoạt động đã hoàn thành',
+              style: AppTextStyles.bodyMedium.copyWith(
+                fontWeight: FontWeight.w700,
+                color: AppColors.success,
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => _handleMarkCompleted(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppColors.success.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.success.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Text(
+                'Hoàn thành plan',
+                style: AppTextStyles.bodySmall.copyWith(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.success,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOverdueBanner() {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -409,127 +469,40 @@ class DayListTab extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.gold.withValues(alpha: 0.25)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.schedule_rounded,
-                size: 18,
+          const Icon(
+            Icons.schedule_rounded,
+            size: 18,
+            color: AppColors.goldDeep,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Kế hoạch đã quá ngày kết thúc. Bạn có thể tiếp tục chỉnh sửa, '
+              'nhưng không thể đánh dấu hoàn thành theo rule hiện tại.',
+              style: AppTextStyles.bodySmall.copyWith(
+                fontWeight: FontWeight.w600,
                 color: AppColors.goldDeep,
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Chuyến đi đã qua ngày kết thúc',
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.goldDeep,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: () async {
-                    final success = await viewModel.markPlanCompleted();
-                    if (!context.mounted) return;
-                    if (success) {
-                      _showSuccessSnack(
-                        context,
-                        'Đã đánh dấu kế hoạch hoàn thành',
-                      );
-                    } else {
-                      _showErrorSnack(
-                        context,
-                        viewModel.errorMessage ?? 'Cập nhật trạng thái thất bại',
-                      );
-                    }
-                  },
-                  child: Container(
-                    height: 34,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      color: AppColors.success.withValues(alpha: 0.1),
-                      border: Border.all(
-                        color: AppColors.success.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.check_rounded,
-                          size: 14,
-                          color: AppColors.success,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Hoàn thành',
-                          style: AppTextStyles.bodySmall.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.success,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Bạn có thể tiếp tục chỉnh sửa'),
-                        backgroundColor: AppColors.primary,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    height: 34,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      color: AppColors.white,
-                      border: Border.all(color: AppColors.divider),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.edit_rounded,
-                          size: 14,
-                          color: AppColors.textMedium,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Tiếp tục sửa',
-                          style: AppTextStyles.bodySmall.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textMedium,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _handleMarkCompleted(BuildContext context) async {
+    final success = await viewModel.markPlanCompleted();
+    if (!context.mounted) return;
+    if (success) {
+      _showSuccessSnack(context, 'Đã đánh dấu kế hoạch hoàn thành');
+    } else {
+      _showErrorSnack(
+        context,
+        viewModel.errorMessage ?? 'Cập nhật trạng thái thất bại',
+      );
+    }
   }
 
   void _showSuccessSnack(BuildContext context, String message) {
