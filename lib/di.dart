@@ -1,23 +1,28 @@
 import 'package:du_xuan/data/implementations/api/activity_api.dart';
 import 'package:du_xuan/data/implementations/api/auth_api.dart';
 import 'package:du_xuan/data/implementations/api/checklist_api.dart';
+import 'package:du_xuan/data/implementations/api/notification_api.dart';
 import 'package:du_xuan/data/implementations/api/openai_service.dart';
 import 'package:du_xuan/data/implementations/api/plan_api.dart';
 import 'package:du_xuan/data/implementations/local/db/app_database.dart';
 import 'package:du_xuan/data/implementations/mapper/activity_mapper.dart';
 import 'package:du_xuan/data/implementations/mapper/auth_mapper.dart';
 import 'package:du_xuan/data/implementations/mapper/checklist_mapper.dart';
+import 'package:du_xuan/data/implementations/mapper/notification_mapper.dart';
 import 'package:du_xuan/data/implementations/mapper/plan_mapper.dart';
 import 'package:du_xuan/data/implementations/repositories/activity_repository.dart';
 import 'package:du_xuan/data/implementations/repositories/auth_repository.dart';
 import 'package:du_xuan/data/implementations/repositories/checklist_repository.dart';
+import 'package:du_xuan/data/implementations/repositories/notification_repository.dart';
 import 'package:du_xuan/data/implementations/repositories/plan_repository.dart';
+import 'package:du_xuan/core/utils/notification_service.dart';
 import 'package:du_xuan/viewmodels/checklist/checklist_viewmodel.dart';
 import 'package:du_xuan/viewmodels/checklist/suggestion_viewmodel.dart';
 import 'package:du_xuan/viewmodels/home/home_viewmodel.dart';
 import 'package:du_xuan/viewmodels/itinerary/activity_form_viewmodel.dart';
 import 'package:du_xuan/viewmodels/itinerary/itinerary_viewmodel.dart';
 import 'package:du_xuan/viewmodels/login/login_viewmodel.dart';
+import 'package:du_xuan/viewmodels/notification/notification_viewmodel.dart';
 import 'package:du_xuan/viewmodels/plan/plan_form_viewmodel.dart';
 import 'package:du_xuan/viewmodels/plan/plan_list_viewmodel.dart';
 import 'package:du_xuan/viewmodels/register/register_viewmodel.dart';
@@ -49,8 +54,10 @@ PlanRepository _buildPlanRepository() {
   return PlanRepository(api: api, planMapper: planMapper, dayMapper: dayMapper);
 }
 
-PlanListViewModel buildPlanListVM() => PlanListViewModel(_buildPlanRepository());
-PlanFormViewModel buildPlanFormVM() => PlanFormViewModel(_buildPlanRepository());
+PlanListViewModel buildPlanListVM() =>
+    PlanListViewModel(_buildPlanRepository(), buildNotificationService());
+PlanFormViewModel buildPlanFormVM() =>
+    PlanFormViewModel(_buildPlanRepository(), buildNotificationService());
 PlanRepository buildPlanRepository() => _buildPlanRepository();
 
 // ─── Itinerary ─────────────────────────────────────────
@@ -64,6 +71,7 @@ ActivityRepository _buildActivityRepository() {
 ItineraryViewModel buildItineraryVM() => ItineraryViewModel(
       planRepo: _buildPlanRepository(),
       activityRepo: _buildActivityRepository(),
+      notificationService: buildNotificationService(),
     );
 
 ActivityFormViewModel buildActivityFormVM() =>
@@ -82,6 +90,27 @@ ChecklistViewModel buildChecklistVM() =>
     ChecklistViewModel(_buildChecklistRepository());
 ChecklistRepository buildChecklistRepository() => _buildChecklistRepository();
 
+NotificationRepository _buildNotificationRepository() {
+  final api = NotificationApi(AppDatabase.instance);
+  final mapper = NotificationMapper();
+  return NotificationRepository(api: api, mapper: mapper);
+}
+
+NotificationRepository buildNotificationRepository() =>
+    _buildNotificationRepository();
+
+NotificationViewModel buildNotificationVM() =>
+    NotificationViewModel(buildNotificationRepository());
+
+NotificationService? _notificationService;
+
+NotificationService buildNotificationService() {
+  _notificationService ??= NotificationService(
+    notificationRepo: buildNotificationRepository(),
+  );
+  return _notificationService!;
+}
+
 // ─── AI Suggestion ─────────────────────────────────────
 
 SuggestionViewModel buildSuggestionVM() => SuggestionViewModel(
@@ -98,4 +127,3 @@ MapViewModel buildMapVM() => MapViewModel(
       activityRepo: _buildActivityRepository(),
       geocodingService: GeocodingService(),
     );
-

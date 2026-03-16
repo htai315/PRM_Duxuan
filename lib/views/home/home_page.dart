@@ -3,9 +3,11 @@ import 'package:intl/intl.dart';
 import 'package:du_xuan/core/constants/app_colors.dart';
 import 'package:du_xuan/core/constants/app_text_styles.dart';
 import 'package:du_xuan/core/enums/plan_status.dart';
+import 'package:du_xuan/core/utils/notification_service.dart';
 import 'package:du_xuan/di.dart';
 import 'package:du_xuan/domain/entities/plan.dart';
 import 'package:du_xuan/viewmodels/home/home_viewmodel.dart';
+import 'package:du_xuan/viewmodels/notification/notification_viewmodel.dart';
 import 'package:du_xuan/viewmodels/plan/plan_list_viewmodel.dart';
 import 'package:du_xuan/views/plan/plan_list_page.dart';
 import 'package:du_xuan/views/home/map_tab.dart';
@@ -20,6 +22,8 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late final _planListVM = buildPlanListVM();
+  late final _notificationVM = buildNotificationVM();
+  late final NotificationService _notificationService = buildNotificationService();
   late final _mapVM = buildMapVM();
   int _currentTabIndex = 0;
 
@@ -34,7 +38,11 @@ class _HomePageState extends State<HomePage> {
     await widget.viewModel.loadSession();
     final userId = widget.viewModel.session?.user.id;
     if (userId != null) {
-      await _planListVM.loadPlans(userId, refresh: true);
+      await Future.wait([
+        _planListVM.loadPlans(userId, refresh: true),
+        _notificationVM.loadUnreadCount(userId),
+      ]);
+      await _notificationService.syncPlanReminders(_planListVM.plans);
     }
     // Ép rebuild toàn bộ UI sau khi data load xong
     if (mounted) setState(() {});
@@ -49,6 +57,9 @@ class _HomePageState extends State<HomePage> {
       final userId = widget.viewModel.session?.user.id;
       if (userId != null && userId > 0) {
         _planListVM.loadPlans(userId, refresh: true);
+        if (index == 0) {
+          _notificationVM.loadUnreadCount(userId);
+        }
       }
     }
     // Refresh map khi chọn tab Bản đồ
@@ -58,6 +69,14 @@ class _HomePageState extends State<HomePage> {
         _mapVM.loadMarkers(userId, force: true);
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _planListVM.dispose();
+    _notificationVM.dispose();
+    _mapVM.dispose();
+    super.dispose();
   }
 
   @override
@@ -72,9 +91,11 @@ class _HomePageState extends State<HomePage> {
               _DashboardTab(
                 viewModel: widget.viewModel,
                 planListVM: _planListVM,
+                notificationVM: _notificationVM,
                 onCreatePlan: _navigateToCreatePlan,
                 onOpenPlans: () => _onTabChanged(1),
                 onOpenMap: () => _onTabChanged(2),
+                onOpenNotifications: _navigateToNotifications,
                 onLogout: _handleLogout,
               ),
               PlanListPage(
@@ -236,6 +257,16 @@ class _HomePageState extends State<HomePage> {
       );
     }
   }
+
+  Future<void> _navigateToNotifications() async {
+    final userId = widget.viewModel.session?.user.id;
+    if (userId == null) return;
+
+    await Navigator.pushNamed(context, '/notifications', arguments: userId);
+
+    if (!mounted) return;
+    await _notificationVM.loadUnreadCount(userId);
+  }
 }
 
 // ═════════════════════════════════════════════════════════
@@ -245,17 +276,21 @@ class _HomePageState extends State<HomePage> {
 class _DashboardTab extends StatelessWidget {
   final HomeViewModel viewModel;
   final PlanListViewModel planListVM;
+  final NotificationViewModel notificationVM;
   final VoidCallback onCreatePlan;
   final VoidCallback onOpenPlans;
   final VoidCallback onOpenMap;
+  final VoidCallback onOpenNotifications;
   final VoidCallback onLogout;
 
   const _DashboardTab({
     required this.viewModel,
     required this.planListVM,
+    required this.notificationVM,
     required this.onCreatePlan,
     required this.onOpenPlans,
     required this.onOpenMap,
+    required this.onOpenNotifications,
     required this.onLogout,
   });
 
@@ -278,7 +313,7 @@ class _DashboardTab extends StatelessWidget {
       ),
       child: SafeArea(
         child: ListenableBuilder(
-          listenable: planListVM,
+          listenable: Listenable.merge([planListVM, notificationVM]),
           builder: (context, _) {
             return SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 26),
@@ -371,6 +406,8 @@ class _DashboardTab extends StatelessWidget {
                       ),
                     ),
                   ),
+                  _buildNotificationButton(),
+                  const SizedBox(width: 10),
                   Material(
                     color: Colors.transparent,
                     child: InkWell(
@@ -824,6 +861,66 @@ class _DashboardTab extends StatelessWidget {
           minHeight: 92,
         ),
       ],
+    );
+  }
+
+  Widget _buildNotificationButton() {
+    final unreadCount = notificationVM.unreadCount;
+    final hasUnread = unreadCount > 0;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onOpenNotifications,
+        borderRadius: BorderRadius.circular(999),
+        child: Ink(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withValues(alpha: 0.2),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.28),
+            ),
+          ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              const Center(
+                child: Icon(
+                  Icons.notifications_none_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+              if (hasUnread)
+                Positioned(
+                  top: 9,
+                  right: 9,
+                  child: Container(
+                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.gold,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: Colors.white, width: 1.3),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      unreadCount > 99 ? '99+' : '$unreadCount',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textDark,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 9,
+                        height: 1.0,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

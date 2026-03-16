@@ -6,6 +6,7 @@ import 'package:du_xuan/views/home/home_page.dart';
 import 'package:du_xuan/views/itinerary/activity_form_page.dart';
 import 'package:du_xuan/views/plan_detail/plan_detail_page.dart';
 import 'package:du_xuan/views/login/login_page.dart';
+import 'package:du_xuan/views/notification/notification_page.dart';
 import 'package:du_xuan/views/plan/plan_form_page.dart';
 import 'package:du_xuan/views/register/register_page.dart';
 import 'package:du_xuan/views/settings/change_password_page.dart';
@@ -23,6 +24,7 @@ class AppRoutes {
   static const String activityEdit = '/activity/edit';
   static const String checklist = '/checklist';
   static const String changePassword = '/change-password';
+  static const String notifications = '/notifications';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -99,6 +101,15 @@ class AppRoutes {
           builder: (_) => ChangePasswordPage(
             viewModel: buildChangePasswordVM(),
             userId: userId,
+          ),
+        );
+      case notifications:
+        final userId = settings.arguments as int;
+        return MaterialPageRoute(
+          builder: (_) => NotificationPage(
+            viewModel: buildNotificationVM(),
+            userId: userId,
+            notificationService: buildNotificationService(),
           ),
         );
       default:

@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:du_xuan/core/utils/notification_service.dart';
 import 'package:du_xuan/core/utils/pagination_utils.dart';
 import 'package:du_xuan/data/interfaces/repositories/i_plan_repository.dart';
 import 'package:du_xuan/domain/entities/plan.dart';
 
 class PlanListViewModel extends ChangeNotifier {
   final IPlanRepository _repository;
+  final NotificationService _notificationService;
 
-  PlanListViewModel(this._repository);
+  PlanListViewModel(this._repository, this._notificationService);
 
   // ─── State ────────────────────────────────────────────
   List<Plan> _plans = [];
@@ -78,6 +80,11 @@ class PlanListViewModel extends ChangeNotifier {
   Future<bool> deletePlan(int id) async {
     try {
       await _repository.delete(id);
+      try {
+        await _notificationService.cancelPlanReminder(id);
+      } catch (e) {
+        debugPrint('Notification cleanup error (plan $id): $e');
+      }
       _plans.removeWhere((p) => p.id == id);
       notifyListeners();
       return true;

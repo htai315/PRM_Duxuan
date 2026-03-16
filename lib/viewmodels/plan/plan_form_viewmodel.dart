@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:du_xuan/core/enums/plan_status.dart';
+import 'package:du_xuan/core/utils/notification_service.dart';
 import 'package:du_xuan/data/interfaces/repositories/i_plan_repository.dart';
 import 'package:du_xuan/domain/entities/plan.dart';
 
 class PlanFormViewModel extends ChangeNotifier {
   final IPlanRepository _repository;
+  final NotificationService _notificationService;
 
-  PlanFormViewModel(this._repository);
+  PlanFormViewModel(this._repository, this._notificationService);
 
   // ─── State ────────────────────────────────────────────
   Plan? _existingPlan;
@@ -100,6 +102,7 @@ class PlanFormViewModel extends ChangeNotifier {
       } else {
         result = await _repository.create(plan);
       }
+      await _syncPlanReminder(result);
 
       _isLoading = false;
       notifyListeners();
@@ -109,6 +112,18 @@ class PlanFormViewModel extends ChangeNotifier {
       _errorMessage = e.toString().replaceFirst('Exception: ', '');
       notifyListeners();
       return null;
+    }
+  }
+
+  Future<void> _syncPlanReminder(Plan plan) async {
+    try {
+      if (plan.status == PlanStatus.active) {
+        await _notificationService.schedulePlanReminder(plan);
+      } else {
+        await _notificationService.cancelPlanReminder(plan.id);
+      }
+    } catch (e) {
+      debugPrint('Notification sync error (plan ${plan.id}): $e');
     }
   }
 }

@@ -9,10 +9,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:du_xuan/main.dart';
+import 'package:du_xuan/di.dart';
 
 void main() {
   testWidgets('App boots', (WidgetTester tester) async {
-    await tester.pumpWidget(const DuXuanApp());
+    final notificationService = buildNotificationService();
+    await tester.pumpWidget(DuXuanApp(notificationService: notificationService));
     expect(find.byType(MaterialApp), findsOneWidget);
   });
 }

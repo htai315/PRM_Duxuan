@@ -138,6 +138,25 @@ class AppDatabase {
           )
         ''');
 
+        await db.execute('''
+          CREATE TABLE notifications(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            plan_id INTEGER,
+            title TEXT NOT NULL,
+            body TEXT NOT NULL,
+            is_read INTEGER DEFAULT 0,
+            type TEXT DEFAULT 'SYSTEM',
+            event_key TEXT UNIQUE,
+            scheduled_at TEXT,
+            created_at TEXT NOT NULL,
+            read_at TEXT,
+            payload TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE
+          )
+        ''');
+
         // ═══════════════════════════════════════════════
         // 3. SEED DATA: 3 tài khoản test
         // ═══════════════════════════════════════════════

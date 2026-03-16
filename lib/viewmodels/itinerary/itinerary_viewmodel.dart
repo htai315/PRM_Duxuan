@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:du_xuan/core/enums/activity_status.dart';
 import 'package:du_xuan/core/enums/plan_status.dart';
+import 'package:du_xuan/core/utils/notification_service.dart';
 import 'package:du_xuan/data/interfaces/repositories/i_activity_repository.dart';
 import 'package:du_xuan/data/interfaces/repositories/i_plan_repository.dart';
 import 'package:du_xuan/domain/entities/activity.dart';
@@ -10,12 +11,15 @@ import 'package:du_xuan/domain/entities/plan_day.dart';
 class ItineraryViewModel extends ChangeNotifier {
   final IPlanRepository _planRepo;
   final IActivityRepository _activityRepo;
+  final NotificationService _notificationService;
 
   ItineraryViewModel({
     required IPlanRepository planRepo,
     required IActivityRepository activityRepo,
+    required NotificationService notificationService,
   })  : _planRepo = planRepo,
-        _activityRepo = activityRepo;
+        _activityRepo = activityRepo,
+        _notificationService = notificationService;
 
   // ─── State ────────────────────────────────────────────
   Plan? _plan;
@@ -214,6 +218,7 @@ class ItineraryViewModel extends ChangeNotifier {
     try {
       final updated = _plan!.copyWith(status: PlanStatus.completed);
       await _planRepo.update(updated);
+      await _syncPlanReminder(updated);
       _plan = updated;
       _errorMessage = null;
       notifyListeners();
@@ -231,6 +236,7 @@ class ItineraryViewModel extends ChangeNotifier {
     try {
       final updated = _plan!.copyWith(status: PlanStatus.active);
       await _planRepo.update(updated);
+      await _syncPlanReminder(updated);
       _plan = updated;
       notifyListeners();
       return true;
@@ -238,6 +244,18 @@ class ItineraryViewModel extends ChangeNotifier {
       _errorMessage = e.toString().replaceFirst('Exception: ', '');
       notifyListeners();
       return false;
+    }
+  }
+
+  Future<void> _syncPlanReminder(Plan plan) async {
+    try {
+      if (plan.status == PlanStatus.active) {
+        await _notificationService.schedulePlanReminder(plan);
+      } else {
+        await _notificationService.cancelPlanReminder(plan.id);
+      }
+    } catch (e) {
+      debugPrint('Notification sync error (plan ${plan.id}): $e');
     }
   }
 }
