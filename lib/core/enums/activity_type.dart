@@ -1,3 +1,4 @@
+import 'package:du_xuan/core/constants/app_colors.dart';
 import 'package:flutter/material.dart';
 
 /// Loại hoạt động trong lịch trình
@@ -45,6 +46,25 @@ enum ActivityType {
         return Icons.hotel_rounded;
       case ActivityType.other:
         return Icons.more_horiz_rounded;
+    }
+  }
+
+  Color get color {
+    switch (this) {
+      case ActivityType.travel:
+        return AppColors.primary;
+      case ActivityType.dining:
+        return AppColors.gold;
+      case ActivityType.sightseeing:
+        return AppColors.blossom;
+      case ActivityType.shopping:
+        return AppColors.goldDeep;
+      case ActivityType.worship:
+        return AppColors.primaryDeep;
+      case ActivityType.rest:
+        return AppColors.blossomDeep;
+      case ActivityType.other:
+        return AppColors.textMedium;
     }
   }
 

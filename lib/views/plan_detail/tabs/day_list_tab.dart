@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:du_xuan/core/constants/app_colors.dart';
 import 'package:du_xuan/core/constants/app_text_styles.dart';
 import 'package:du_xuan/core/enums/activity_status.dart';
+import 'package:du_xuan/core/utils/app_feedback.dart';
 import 'package:du_xuan/domain/entities/plan_day.dart';
 import 'package:du_xuan/viewmodels/itinerary/itinerary_viewmodel.dart';
 import 'package:du_xuan/views/plan_detail/day_detail_page.dart';
+import 'package:du_xuan/views/shared/widgets/app_action_chip.dart';
+import 'package:du_xuan/views/shared/widgets/app_empty_state.dart';
 import 'package:intl/intl.dart';
 
 /// Tab 1: Danh sách ngày — mỗi ngày là 1 card, bấm drill-down.
@@ -21,32 +24,12 @@ class DayListTab extends StatelessWidget {
       builder: (context, _) {
         final days = viewModel.days;
         if (days.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.calendar_month_rounded,
-                    size: 30,
-                    color: AppColors.primary,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text('Chưa có ngày nào', style: AppTextStyles.titleMedium),
-                const SizedBox(height: 6),
-                Text(
-                  'Sửa kế hoạch để thêm ngày',
-                  style: AppTextStyles.bodySmall,
-                ),
-              ],
-            ),
+          return const AppEmptyState(
+            icon: Icons.calendar_month_rounded,
+            title: 'Chưa có ngày nào',
+            subtitle: 'Sửa kế hoạch để thêm ngày.',
+            accentColor: AppColors.primary,
+            iconBoxSize: 60,
           );
         }
 
@@ -56,7 +39,7 @@ class DayListTab extends StatelessWidget {
         final canMarkPlanCompleted = viewModel.canMarkPlanCompleted;
 
         return ListView(
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 18),
           children: [
             // Status banners
             if (isViewMode) _buildCompletedBanner(context),
@@ -123,7 +106,7 @@ class DayListTab extends StatelessWidget {
         viewModel.loadPlan(planId);
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 14),
+        margin: const EdgeInsets.only(bottom: 10),
         decoration: BoxDecoration(
           color: AppColors.white,
           borderRadius: BorderRadius.circular(20),
@@ -142,13 +125,13 @@ class DayListTab extends StatelessWidget {
           children: [
             // ── Header row ──
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
               child: Row(
                 children: [
                   // Day number badge (gradient đa sắc)
                   Container(
-                    width: 50,
-                    height: 50,
+                    width: 46,
+                    height: 46,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
@@ -170,12 +153,12 @@ class DayListTab extends StatelessWidget {
                         style: AppTextStyles.titleMedium.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w900,
-                          fontSize: 20,
+                          fontSize: 18,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 12),
 
                   // Title + date
                   Expanded(
@@ -188,6 +171,7 @@ class DayListTab extends StatelessWidget {
                               'Ngày ${day.dayNumber}',
                               style: AppTextStyles.bodyLarge.copyWith(
                                 fontWeight: FontWeight.w700,
+                                fontSize: 17,
                               ),
                             ),
                             if (isToday) ...[
@@ -252,7 +236,7 @@ class DayListTab extends StatelessWidget {
 
             // ── Summary chips ──
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 2),
               child: Row(
                 children: [
                   // Activities count
@@ -275,14 +259,27 @@ class DayListTab extends StatelessWidget {
                   ],
                   const Spacer(),
                   if (activityCount > 0)
-                    Text(
-                      '$doneCount/$activityCount',
-                      style: AppTextStyles.bodySmall.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: isAllDone
-                            ? AppColors.success
-                            : AppColors.textLight,
-                        fontSize: 11,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: (isAllDone ? AppColors.success : grad[0])
+                            .withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: (isAllDone ? AppColors.success : grad[0])
+                              .withValues(alpha: 0.22),
+                        ),
+                      ),
+                      child: Text(
+                        '$doneCount/$activityCount',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: isAllDone ? AppColors.success : grad[0],
+                          fontSize: 10.5,
+                        ),
                       ),
                     ),
                 ],
@@ -292,13 +289,13 @@ class DayListTab extends StatelessWidget {
             // ── Progress bar ──
             if (activityCount > 0)
               Padding(
-                padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+                padding: const EdgeInsets.fromLTRB(14, 6, 14, 12),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(999),
                   child: LinearProgressIndicator(
                     value: progress,
-                    minHeight: 5,
-                    backgroundColor: AppColors.divider,
+                    minHeight: 8,
+                    backgroundColor: grad[0].withValues(alpha: 0.12),
                     valueColor: AlwaysStoppedAnimation<Color>(
                       isAllDone ? AppColors.success : grad[0],
                     ),
@@ -306,7 +303,7 @@ class DayListTab extends StatelessWidget {
                 ),
               )
             else
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
           ],
         ),
       ),
@@ -375,25 +372,16 @@ class DayListTab extends StatelessWidget {
               ),
             ),
           ),
-          GestureDetector(
+          AppActionChip(
+            label: 'Mở lại sửa',
             onTap: () => _confirmReopen(context),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: AppColors.textLight.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Text(
-                'Mở lại sửa',
-                style: AppTextStyles.bodySmall.copyWith(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textMedium,
-                ),
-              ),
-            ),
+            textColor: AppColors.textMedium,
+            backgroundColor: AppColors.white.withValues(alpha: 0.72),
+            borderColor: AppColors.textLight.withValues(alpha: 0.3),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            borderRadius: 8,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
           ),
         ],
       ),
@@ -423,33 +411,22 @@ class DayListTab extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Tất cả hoạt động đã hoàn thành',
+              'Tất cả hoạt động hiện có đã hoàn thành',
               style: AppTextStyles.bodyMedium.copyWith(
                 fontWeight: FontWeight.w700,
                 color: AppColors.success,
               ),
             ),
           ),
-          GestureDetector(
+          AppActionChip(
+            label: 'Hoàn thành plan',
             onTap: () => _handleMarkCompleted(context),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppColors.success.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: AppColors.success.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Text(
-                'Hoàn thành plan',
-                style: AppTextStyles.bodySmall.copyWith(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.success,
-                ),
-              ),
-            ),
+            textColor: AppColors.success,
+            backgroundColor: AppColors.success.withValues(alpha: 0.12),
+            borderColor: AppColors.success.withValues(alpha: 0.3),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            borderRadius: 8,
+            fontSize: 11,
           ),
         ],
       ),
@@ -506,50 +483,19 @@ class DayListTab extends StatelessWidget {
   }
 
   void _showSuccessSnack(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    AppFeedback.showSuccessSnack(context, message);
   }
 
   void _showErrorSnack(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.error,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    AppFeedback.showErrorSnack(context, message);
   }
 
   Future<void> _confirmReopen(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await AppFeedback.showConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Mở lại chỉnh sửa?', style: AppTextStyles.titleMedium),
-        content: Text(
-          'Kế hoạch sẽ chuyển về chế độ chỉnh sửa.',
-          style: AppTextStyles.bodyMedium,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Hủy', style: TextStyle(color: AppColors.textLight)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Mở lại', style: TextStyle(color: AppColors.primary)),
-          ),
-        ],
-      ),
+      title: 'Mở lại chỉnh sửa?',
+      message: 'Kế hoạch sẽ chuyển về chế độ chỉnh sửa.',
+      confirmText: 'Mở lại',
     );
     if (confirmed == true) {
       final success = await viewModel.reopenForEditing();

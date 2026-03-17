@@ -21,6 +21,7 @@ class HomeViewModel extends ChangeNotifier {
   // ─── Actions ──────────────────────────────────────────
 
   void switchTab(int index) {
+    if (_currentTab == index) return;
     _currentTab = index;
     notifyListeners();
   }

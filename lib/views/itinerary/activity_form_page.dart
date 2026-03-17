@@ -2,9 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:du_xuan/core/constants/app_colors.dart';
 import 'package:du_xuan/core/constants/app_text_styles.dart';
 import 'package:du_xuan/core/enums/activity_type.dart';
+import 'package:du_xuan/core/utils/app_form_validators.dart';
 import 'package:du_xuan/domain/entities/activity.dart';
 import 'package:du_xuan/viewmodels/itinerary/activity_form_viewmodel.dart';
-import 'dart:ui';
+import 'package:du_xuan/views/itinerary/widgets/activity_form_app_bar.dart';
+import 'package:du_xuan/views/itinerary/widgets/activity_form_bottom_action.dart';
+import 'package:du_xuan/views/itinerary/widgets/activity_form_input.dart';
+import 'package:du_xuan/views/itinerary/widgets/activity_form_summary_card.dart';
+import 'package:du_xuan/views/itinerary/widgets/activity_form_type_selector.dart';
+import 'package:du_xuan/views/shared/widgets/app_form_section_card.dart';
 
 class ActivityFormPage extends StatefulWidget {
   final ActivityFormViewModel viewModel;
@@ -32,8 +38,8 @@ class _ActivityFormPageState extends State<ActivityFormPage> {
   TimeOfDay? _endTime;
 
   // Real-time validation state
-  bool _hasTimeError = false;
   String? _timeErrorMessage;
+  String? _costErrorMessage;
 
   // Track scroll for header shadow
   final ScrollController _scrollController = ScrollController();
@@ -106,7 +112,11 @@ class _ActivityFormPageState extends State<ActivityFormPage> {
           bottom: false,
           child: Column(
             children: [
-              _buildAppBar(isEdit ? 'Sửa hoạt động' : 'Thêm hoạt động'),
+              ActivityFormAppBar(
+                title: isEdit ? 'Sửa hoạt động' : 'Thêm hoạt động',
+                isScrolled: _isScrolled,
+                onBack: () => Navigator.pop(context),
+              ),
               Expanded(
                 child: ListenableBuilder(
                   listenable: widget.viewModel,
@@ -117,83 +127,11 @@ class _ActivityFormPageState extends State<ActivityFormPage> {
           ),
         ),
       ),
-      bottomNavigationBar: _buildBottomActions(),
-    );
-  }
-
-  Widget _buildAppBar(String title) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: _isScrolled
-            ? AppColors.white.withValues(alpha: 0.9)
-            : Colors.transparent,
-        boxShadow: _isScrolled
-            ? [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : [],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => Navigator.pop(context),
-              borderRadius: BorderRadius.circular(999),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppColors.divider.withValues(alpha: 0.75),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.arrow_back_ios_new_rounded,
-                  size: 18,
-                  color: AppColors.textDark,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Lịch trình trong ngày',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.textLight,
-                    fontSize: 11,
-                  ),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  title,
-                  style: AppTextStyles.titleLarge.copyWith(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+      bottomNavigationBar: ActivityFormBottomAction(
+        isDisabled: _isSaveDisabled,
+        isLoading: widget.viewModel.isLoading,
+        isEdit: isEdit,
+        onSave: _isSaveDisabled ? null : _handleSave,
       ),
     );
   }
@@ -203,37 +141,52 @@ class _ActivityFormPageState extends State<ActivityFormPage> {
       controller: _scrollController,
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
       children: [
-        _buildSummaryCard(),
+        ActivityFormSummaryCard(
+          selectedType: _selectedType,
+          startLabel: _startTime != null ? _formatTime(_startTime)! : '--:--',
+          endLabel: _endTime != null ? _formatTime(_endTime)! : '--:--',
+          typeColor: _selectedType.color,
+        ),
         const SizedBox(height: 20),
 
-        // Tiêu đề *
-        _buildSectionTitle('Thông tin chính'),
-        _buildCard(
+        AppFormSectionCard(
+          title: 'Thông tin chính',
+          subtitle: 'Tên và mô tả ngắn cho hoạt động của bạn',
+          icon: Icons.edit_note_rounded,
+          accentColor: AppColors.primary,
           child: Column(
             children: [
-              _textInput(
+              ActivityFormInput(
                 controller: _titleCtrl,
                 hint: 'Tên hoạt động *',
                 icon: Icons.edit_rounded,
+                iconColor: AppColors.primary,
                 isBorderless: true,
-                onChanged: (_) {
-                  widget.viewModel.clearError();
-                  setState(() {});
-                },
+                onChanged: _handleTextChanged,
               ),
             ],
           ),
         ),
         const SizedBox(height: 24),
 
-        // Phân loại
-        _buildSectionTitle('Phân loại'),
-        _buildTypeSelector(),
+        AppFormSectionCard(
+          title: 'Phân loại',
+          subtitle: 'Chọn loại hoạt động để nhóm và hiển thị phù hợp',
+          icon: Icons.category_rounded,
+          accentColor: AppColors.blossomDeep,
+          child: ActivityFormTypeSelector(
+            selectedType: _selectedType,
+            onSelected: (type) => setState(() => _selectedType = type),
+            resolveColor: (type) => type.color,
+          ),
+        ),
         const SizedBox(height: 24),
 
-        // Thời gian & Địa điểm
-        _buildSectionTitle('Hành trình'),
-        _buildCard(
+        AppFormSectionCard(
+          title: 'Hành trình',
+          subtitle: 'Thiết lập thời gian và địa điểm cho hoạt động',
+          icon: Icons.route_rounded,
+          accentColor: AppColors.primary,
           child: Column(
             children: [
               Padding(
@@ -254,6 +207,7 @@ class _ActivityFormPageState extends State<ActivityFormPage> {
                         children: [
                           Expanded(
                             child: _timePicker('Bắt đầu', _startTime, (t) {
+                              widget.viewModel.clearError();
                               setState(() => _startTime = t);
                               _validateTimeRange();
                             }),
@@ -268,6 +222,7 @@ class _ActivityFormPageState extends State<ActivityFormPage> {
                           ),
                           Expanded(
                             child: _timePicker('Kết thúc', _endTime, (t) {
+                              widget.viewModel.clearError();
                               setState(() => _endTime = t);
                               _validateTimeRange();
                             }),
@@ -278,7 +233,7 @@ class _ActivityFormPageState extends State<ActivityFormPage> {
                   ],
                 ),
               ),
-              if (_hasTimeError && _timeErrorMessage != null) ...[
+              if (_timeErrorMessage != null) ...[
                 Padding(
                   padding: const EdgeInsets.only(
                     left: 48,
@@ -299,41 +254,71 @@ class _ActivityFormPageState extends State<ActivityFormPage> {
                 indent: 48,
                 endIndent: 16,
               ),
-              _textInput(
+              ActivityFormInput(
                 controller: _locationCtrl,
                 hint: 'Địa điểm',
                 icon: Icons.place_rounded,
+                iconColor: AppColors.blossomDeep,
                 isBorderless: true,
+                onChanged: _handleTextChanged,
               ),
             ],
           ),
         ),
         const SizedBox(height: 24),
 
-        // Chi phí & Ghi chú
-        _buildSectionTitle('Chi tiết khác'),
-        _buildCard(
+        AppFormSectionCard(
+          title: 'Chi tiết khác',
+          subtitle: 'Chi phí dự kiến và ghi chú bổ sung',
+          icon: Icons.sticky_note_2_rounded,
+          accentColor: AppColors.goldDeep,
           child: Column(
             children: [
-              _textInput(
+              ActivityFormInput(
                 controller: _costCtrl,
                 hint: 'Chi phí ước tính (VNĐ)',
                 icon: Icons.account_balance_wallet_rounded,
+                iconColor: AppColors.goldDeep,
                 keyboardType: TextInputType.number,
                 isBorderless: true,
+                onChanged: (value) {
+                  widget.viewModel.clearError();
+                  _validateCostInput(value);
+                },
               ),
+              if (_costErrorMessage != null) ...[
+                Padding(
+                  padding: const EdgeInsets.only(
+                    left: 48,
+                    right: 16,
+                    top: 8,
+                    bottom: 4,
+                  ),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      _costErrorMessage!,
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.error,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               Divider(
                 color: AppColors.divider.withValues(alpha: 0.5),
                 height: 1,
                 indent: 48,
                 endIndent: 16,
               ),
-              _textInput(
+              ActivityFormInput(
                 controller: _noteCtrl,
                 hint: 'Ghi chú thêm...',
                 icon: Icons.sticky_note_2_rounded,
+                iconColor: AppColors.textMedium,
                 maxLines: 2,
                 isBorderless: true,
+                onChanged: _handleTextChanged,
               ),
             ],
           ),
@@ -378,180 +363,24 @@ class _ActivityFormPageState extends State<ActivityFormPage> {
 
   void _validateTimeRange() {
     setState(() {
-      if (_startTime != null && _endTime != null) {
-        final startMinutes = _startTime!.hour * 60 + _startTime!.minute;
-        final endMinutes = _endTime!.hour * 60 + _endTime!.minute;
-
-        if (endMinutes <= startMinutes) {
-          _hasTimeError = true;
-          _timeErrorMessage = 'Giờ kết thúc phải sau giờ bắt đầu';
-        } else {
-          _hasTimeError = false;
-          _timeErrorMessage = null;
-        }
-      } else {
-        _hasTimeError = false;
-        _timeErrorMessage = null;
-      }
+      _timeErrorMessage = AppFormValidators.validateActivityTimeRange(
+        _formatTime(_startTime),
+        _formatTime(_endTime),
+      );
     });
   }
 
-  Widget _buildSectionTitle(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 12),
-      child: Text(
-        text,
-        style: AppTextStyles.bodyMedium.copyWith(
-          color: AppColors.textMedium,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.3,
-        ),
-      ),
-    );
+  void _validateCostInput(String value) {
+    setState(() {
+      _costErrorMessage = AppFormValidators.parseEstimatedCost(
+        value,
+      ).errorMessage;
+    });
   }
 
-  Widget _buildCard({required Widget child}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.divider.withValues(alpha: 0.75)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
-
-  Widget _textInput({
-    required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    int maxLines = 1,
-    TextInputType? keyboardType,
-    bool isBorderless = false,
-    ValueChanged<String>? onChanged,
-  }) {
-    Color iconColor = AppColors.textMedium;
-    if (icon == Icons.account_balance_wallet_rounded) {
-      iconColor = AppColors.goldDeep;
-    }
-    if (icon == Icons.place_rounded) iconColor = AppColors.blossomDeep;
-    if (icon == Icons.edit_rounded) iconColor = AppColors.primary;
-
-    final inputField = TextField(
-      controller: controller,
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      onChanged: (value) {
-        if (onChanged != null) {
-          onChanged(value);
-          return;
-        }
-        widget.viewModel.clearError();
-      },
-      style: AppTextStyles.bodyLarge.copyWith(fontWeight: FontWeight.w500),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: AppTextStyles.bodyMedium.copyWith(
-          color: AppColors.textLight,
-        ),
-        prefixIcon: Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 12,
-            top: maxLines > 1 ? 14 : 0,
-          ),
-          child: Icon(icon, color: iconColor, size: 20),
-        ),
-        prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
-        border: InputBorder.none,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
-        ),
-      ),
-    );
-
-    if (isBorderless) return inputField;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white.withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: inputField,
-    );
-  }
-
-  Widget _buildTypeSelector() {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children: ActivityType.values.map((type) {
-        final isSelected = type == _selectedType;
-        Color typeColor = _getTypeColor(type);
-
-        return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => setState(() => _selectedType = type),
-            borderRadius: BorderRadius.circular(16),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? typeColor.withValues(alpha: 0.1)
-                    : AppColors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isSelected
-                      ? typeColor.withValues(alpha: 0.5)
-                      : AppColors.divider.withValues(alpha: 0.5),
-                  width: 1,
-                ),
-                boxShadow: isSelected
-                    ? []
-                    : [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.02),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    type.icon,
-                    size: 18,
-                    color: isSelected ? typeColor : AppColors.textMedium,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    type.label,
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: isSelected ? typeColor : AppColors.textMedium,
-                      fontWeight: isSelected
-                          ? FontWeight.w700
-                          : FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
+  void _handleTextChanged(String value) {
+    widget.viewModel.clearError();
+    setState(() {});
   }
 
   Widget _timePicker(
@@ -604,145 +433,15 @@ class _ActivityFormPageState extends State<ActivityFormPage> {
     );
   }
 
-  Widget _buildSummaryCard() {
-    final typeColor = _getTypeColor(_selectedType);
-    final start = _startTime != null ? _formatTime(_startTime) : '--:--';
-    final end = _endTime != null ? _formatTime(_endTime) : '--:--';
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        color: AppColors.white.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.divider.withValues(alpha: 0.8)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.025),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: typeColor.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Icon(_selectedType.icon, size: 19, color: typeColor),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _selectedType.label,
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: AppColors.textDark,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Khung giờ: $start - $end',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.textLight,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomActions() {
+  bool get _isSaveDisabled {
     final isTitleEmpty = _titleCtrl.text.trim().isEmpty;
-    final bool isDisable =
-        isTitleEmpty || _hasTimeError || widget.viewModel.isLoading;
-    final isEdit = widget.existingActivity != null;
-
-    return ClipRRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: Container(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 14,
-            bottom: MediaQuery.of(context).padding.bottom + 14,
-          ),
-          decoration: BoxDecoration(
-            color: AppColors.white.withValues(alpha: 0.8),
-            border: Border(
-              top: BorderSide(
-                color: AppColors.divider.withValues(alpha: 0.5),
-                width: 1,
-              ),
-            ),
-          ),
-          child: AnimatedOpacity(
-            duration: const Duration(milliseconds: 200),
-            opacity: isDisable ? 0.52 : 1,
-            child: Material(
-              color: Colors.transparent,
-              child: Ink(
-                height: 48,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  gradient: const LinearGradient(
-                    colors: [AppColors.primary, AppColors.primaryDeep],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.28),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: InkWell(
-                  onTap: isDisable ? null : _handleSave,
-                  borderRadius: BorderRadius.circular(14),
-                  child: Center(
-                    child: widget.viewModel.isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: Colors.white,
-                            ),
-                          )
-                        : Text(
-                            isEdit ? 'Cập nhật hoạt động' : 'Tạo mới hoạt động',
-                            style: AppTextStyles.labelLarge.copyWith(
-                              color: Colors.white,
-                            ),
-                          ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+    return isTitleEmpty ||
+        _timeErrorMessage != null ||
+        _costErrorMessage != null ||
+        widget.viewModel.isLoading;
   }
 
   Future<void> _handleSave() async {
-    final costText = _costCtrl.text.trim();
-    double? cost;
-    if (costText.isNotEmpty) {
-      cost = double.tryParse(costText);
-    }
-
     final result = await widget.viewModel.saveActivity(
       planDayId: widget.planDayId,
       title: _titleCtrl.text,
@@ -751,29 +450,10 @@ class _ActivityFormPageState extends State<ActivityFormPage> {
       endTime: _formatTime(_endTime),
       locationText: _locationCtrl.text,
       note: _noteCtrl.text,
-      estimatedCost: cost,
+      estimatedCostText: _costCtrl.text,
     );
     if (result != null && mounted) {
       Navigator.pop(context, true);
-    }
-  }
-
-  Color _getTypeColor(ActivityType activityType) {
-    switch (activityType.name) {
-      case 'travel':
-        return AppColors.primary;
-      case 'dining':
-        return AppColors.gold;
-      case 'sightseeing':
-        return AppColors.blossom;
-      case 'shopping':
-        return AppColors.goldDeep;
-      case 'worship':
-        return AppColors.primaryDeep;
-      case 'rest':
-        return AppColors.blossomDeep;
-      default:
-        return AppColors.textMedium;
     }
   }
 }

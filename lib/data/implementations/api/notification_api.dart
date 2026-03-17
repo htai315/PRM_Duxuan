@@ -2,38 +2,15 @@ import 'package:du_xuan/data/dtos/notification/create_notification_request_dto.d
 import 'package:du_xuan/data/dtos/notification/notification_dto.dart';
 import 'package:du_xuan/data/implementations/local/db/app_database.dart';
 import 'package:du_xuan/data/interfaces/api/i_notification_api.dart';
-import 'package:sqflite/sqflite.dart';
 
 class NotificationApi implements INotificationApi {
   final AppDatabase _database;
 
   NotificationApi(this._database);
 
-  Future<void> _ensureTable(Database db) async {
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS notifications(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        plan_id INTEGER,
-        title TEXT NOT NULL,
-        body TEXT NOT NULL,
-        is_read INTEGER DEFAULT 0,
-        type TEXT DEFAULT 'SYSTEM',
-        event_key TEXT UNIQUE,
-        scheduled_at TEXT,
-        created_at TEXT NOT NULL,
-        read_at TEXT,
-        payload TEXT,
-        FOREIGN KEY (user_id) REFERENCES users(id),
-        FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE
-      )
-    ''');
-  }
-
   @override
   Future<List<NotificationDto>> getByUserId(int userId) async {
     final db = await _database.db;
-    await _ensureTable(db);
     final nowIso = DateTime.now().toIso8601String();
 
     final rows = await db.query(
@@ -48,7 +25,6 @@ class NotificationApi implements INotificationApi {
   @override
   Future<int> getUnreadCount(int userId) async {
     final db = await _database.db;
-    await _ensureTable(db);
     final nowIso = DateTime.now().toIso8601String();
 
     final rows = await db.rawQuery(
@@ -63,7 +39,6 @@ class NotificationApi implements INotificationApi {
   @override
   Future<NotificationDto?> getByEventKey(String eventKey) async {
     final db = await _database.db;
-    await _ensureTable(db);
 
     final rows = await db.query(
       'notifications',
@@ -78,7 +53,6 @@ class NotificationApi implements INotificationApi {
   @override
   Future<NotificationDto?> getById(int id) async {
     final db = await _database.db;
-    await _ensureTable(db);
 
     final rows = await db.query(
       'notifications',
@@ -93,21 +67,16 @@ class NotificationApi implements INotificationApi {
   @override
   Future<int> create(CreateNotificationRequestDto req) async {
     final db = await _database.db;
-    await _ensureTable(db);
     return db.insert('notifications', req.toMap());
   }
 
   @override
   Future<void> markAsRead(int id, String readAtIso) async {
     final db = await _database.db;
-    await _ensureTable(db);
 
     await db.update(
       'notifications',
-      {
-        'is_read': 1,
-        'read_at': readAtIso,
-      },
+      {'is_read': 1, 'read_at': readAtIso},
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -116,15 +85,11 @@ class NotificationApi implements INotificationApi {
   @override
   Future<void> markAllAsRead(int userId, String readAtIso) async {
     final db = await _database.db;
-    await _ensureTable(db);
     final nowIso = DateTime.now().toIso8601String();
 
     await db.update(
       'notifications',
-      {
-        'is_read': 1,
-        'read_at': readAtIso,
-      },
+      {'is_read': 1, 'read_at': readAtIso},
       where:
           'user_id = ? AND is_read = 0 AND (scheduled_at IS NULL OR scheduled_at <= ?)',
       whereArgs: [userId, nowIso],
@@ -134,14 +99,12 @@ class NotificationApi implements INotificationApi {
   @override
   Future<void> deleteByPlanId(int planId) async {
     final db = await _database.db;
-    await _ensureTable(db);
     await db.delete('notifications', where: 'plan_id = ?', whereArgs: [planId]);
   }
 
   @override
   Future<void> deleteByEventKey(String eventKey) async {
     final db = await _database.db;
-    await _ensureTable(db);
     await db.delete(
       'notifications',
       where: 'event_key = ?',
@@ -152,7 +115,6 @@ class NotificationApi implements INotificationApi {
   @override
   Future<void> deleteReminderByPlanId(int planId) async {
     final db = await _database.db;
-    await _ensureTable(db);
     await db.delete(
       'notifications',
       where: 'plan_id = ? AND type = ?',

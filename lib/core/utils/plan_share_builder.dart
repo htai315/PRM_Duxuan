@@ -1,5 +1,9 @@
 import 'package:du_xuan/core/enums/activity_type.dart';
 import 'package:du_xuan/di.dart';
+import 'package:du_xuan/data/interfaces/repositories/i_activity_repository.dart';
+import 'package:du_xuan/data/interfaces/repositories/i_checklist_repository.dart';
+import 'package:du_xuan/data/interfaces/repositories/i_plan_repository.dart';
+import 'package:du_xuan/core/utils/date_ui.dart';
 import 'package:du_xuan/domain/entities/activity.dart';
 import 'package:du_xuan/domain/entities/checklist_item.dart';
 import 'package:du_xuan/domain/entities/plan.dart';
@@ -11,24 +15,40 @@ class PlanShareBuilder {
   PlanShareBuilder._();
 
   /// Load plan + activities + checklist → tạo text
-  static Future<String> build(int planId) async {
-    final planRepo = buildPlanRepository();
-    final activityRepo = buildActivityRepository();
-    final checklistRepo = buildChecklistRepository();
+  static Future<String> build(
+    int planId, {
+    IPlanRepository? planRepo,
+    IActivityRepository? activityRepo,
+    IChecklistRepository? checklistRepo,
+  }) async {
+    final resolvedPlanRepo = planRepo ?? buildPlanRepository();
+    final resolvedActivityRepo = activityRepo ?? buildActivityRepository();
+    final resolvedChecklistRepo = checklistRepo ?? buildChecklistRepository();
 
-    final plan = await planRepo.getById(planId);
+    final plan = await resolvedPlanRepo.getById(planId);
     if (plan == null) return 'Không tìm thấy kế hoạch';
 
-    // Load activities per day
-    final activitiesByDay = <PlanDay, List<Activity>>{};
-    for (final day in plan.days) {
-      activitiesByDay[day] = await activityRepo.getByPlanDayId(day.id);
-    }
+    final activitiesFuture = _loadActivitiesByDay(plan, resolvedActivityRepo);
+    final checklistFuture = resolvedChecklistRepo.getByPlanId(planId);
 
-    // Load checklist details
-    final checklistItems = await checklistRepo.getByPlanId(planId);
+    final activitiesByDay = await activitiesFuture;
+    final checklistItems = await checklistFuture;
 
     return _format(plan, activitiesByDay, checklistItems);
+  }
+
+  static Future<Map<PlanDay, List<Activity>>> _loadActivitiesByDay(
+    Plan plan,
+    IActivityRepository activityRepo,
+  ) async {
+    final entries = await Future.wait(
+      plan.days.map((day) async {
+        final activities = await activityRepo.getByPlanDayId(day.id);
+        return MapEntry(day, activities);
+      }),
+    );
+
+    return Map<PlanDay, List<Activity>>.fromEntries(entries);
   }
 
   static String _format(
@@ -36,15 +56,14 @@ class PlanShareBuilder {
     Map<PlanDay, List<Activity>> activitiesByDay,
     List<ChecklistItem> checklistItems,
   ) {
-    final dateFmt = DateFormat('dd/MM/yyyy');
     final buf = StringBuffer();
 
     // Header
     buf.writeln('KẾ HOẠCH CHI TIẾT');
     buf.writeln(plan.name.toUpperCase());
     buf.writeln(
-      'Thời gian: ${dateFmt.format(plan.startDate)} - '
-      '${dateFmt.format(plan.endDate)} (${plan.totalDays} ngày)',
+      'Thời gian: ${DateUi.fullDateRange(plan.startDate, plan.endDate)} '
+      '(${DateUi.dayCountLabel(plan.totalDays)})',
     );
     if (plan.participants != null && plan.participants!.isNotEmpty) {
       buf.writeln('Thành viên: ${plan.participants}');
@@ -63,17 +82,10 @@ class PlanShareBuilder {
       ..sort((a, b) => a.dayNumber.compareTo(b.dayNumber));
 
     for (final day in sortedDays) {
-      final activities = [...activitiesByDay[day]!]
-        ..sort((a, b) {
-          final byOrder = a.orderIndex.compareTo(b.orderIndex);
-          if (byOrder != 0) return byOrder;
-          final aTime = a.startTime ?? '';
-          final bTime = b.startTime ?? '';
-          return aTime.compareTo(bTime);
-        });
+      final activities = _sortActivities(activitiesByDay[day]!);
 
       buf.writeln();
-      buf.writeln('Ngày ${day.dayNumber} - ${dateFmt.format(day.date)}');
+      buf.writeln('Ngày ${day.dayNumber} - ${DateUi.fullDate(day.date)}');
 
       if (activities.isEmpty) {
         buf.writeln('- Chưa có hoạt động');
@@ -94,7 +106,9 @@ class PlanShareBuilder {
           }
 
           if (a.estimatedCost != null && a.estimatedCost! > 0) {
-            buf.writeln('  • Chi phí dự kiến: ${_formatCurrency(a.estimatedCost!)}');
+            buf.writeln(
+              '  • Chi phí dự kiến: ${_formatCurrency(a.estimatedCost!)}',
+            );
           }
 
           if (a.note != null && a.note!.isNotEmpty) {
@@ -122,12 +136,7 @@ class PlanShareBuilder {
 
     final sortedCategoryNames = byCategory.keys.toList()..sort();
     for (final category in sortedCategoryNames) {
-      final items = byCategory[category]!
-        ..sort((a, b) {
-          final byPriority = b.priority.compareTo(a.priority);
-          if (byPriority != 0) return byPriority;
-          return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-        });
+      final items = _sortChecklistItems(byCategory[category]!);
 
       buf.writeln('- $category:');
       for (final item in items) {
@@ -141,6 +150,24 @@ class PlanShareBuilder {
     }
 
     return buf.toString();
+  }
+
+  static List<Activity> _sortActivities(List<Activity> activities) {
+    return [...activities]..sort((a, b) {
+      final byOrder = a.orderIndex.compareTo(b.orderIndex);
+      if (byOrder != 0) return byOrder;
+      final aTime = a.startTime ?? '';
+      final bTime = b.startTime ?? '';
+      return aTime.compareTo(bTime);
+    });
+  }
+
+  static List<ChecklistItem> _sortChecklistItems(List<ChecklistItem> items) {
+    return [...items]..sort((a, b) {
+      final byPriority = b.priority.compareTo(a.priority);
+      if (byPriority != 0) return byPriority;
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
   }
 
   static String _typeIcon(ActivityType type) {

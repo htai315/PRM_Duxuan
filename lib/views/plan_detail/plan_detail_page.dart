@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:intl/intl.dart';
 import 'package:du_xuan/core/constants/app_colors.dart';
 import 'package:du_xuan/core/constants/app_text_styles.dart';
+import 'package:du_xuan/core/utils/app_feedback.dart';
+import 'package:du_xuan/core/utils/date_ui.dart';
+import 'package:du_xuan/core/utils/plan_ui.dart';
 import 'package:du_xuan/core/utils/plan_share_builder.dart';
 import 'package:du_xuan/domain/entities/plan.dart';
+import 'package:du_xuan/routes/app_routes.dart';
+import 'package:du_xuan/routes/route_args.dart';
 import 'package:du_xuan/viewmodels/itinerary/itinerary_viewmodel.dart';
 import 'package:du_xuan/viewmodels/checklist/checklist_viewmodel.dart';
 import 'package:du_xuan/views/plan_detail/tabs/day_list_tab.dart';
 import 'package:du_xuan/views/plan_detail/tabs/checklist_tab.dart';
 import 'package:du_xuan/views/plan_detail/tabs/locations_tab.dart';
+import 'package:du_xuan/views/shared/widgets/app_badge_chip.dart';
+import 'package:du_xuan/views/shared/widgets/app_circle_icon.dart';
+import 'package:du_xuan/views/shared/widgets/app_loading_state.dart';
 import 'package:du_xuan/di.dart';
 
 /// Trang chi tiết 1 kế hoạch.
@@ -32,35 +39,18 @@ class _PlanDetailPageState extends State<PlanDetailPage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   late final ChecklistViewModel _checklistVM;
-  int _locationsRefreshToken = 0;
-  int _lastTabIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _tabController.addListener(_handleTabChanged);
     _checklistVM = buildChecklistVM();
     widget.viewModel.loadPlan(widget.planId);
     _checklistVM.loadItems(widget.planId);
   }
 
-  void _handleTabChanged() {
-    if (_tabController.indexIsChanging) return;
-    final index = _tabController.index;
-    if (index == _lastTabIndex) return;
-    _lastTabIndex = index;
-
-    if (index == 2 && mounted) {
-      setState(() {
-        _locationsRefreshToken++;
-      });
-    }
-  }
-
   @override
   void dispose() {
-    _tabController.removeListener(_handleTabChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -89,7 +79,12 @@ class _PlanDetailPageState extends State<PlanDetailPage>
             listenable: widget.viewModel,
             builder: (context, _) {
               if (widget.viewModel.isLoading && widget.viewModel.plan == null) {
-                return const Center(child: CircularProgressIndicator());
+                return const AppLoadingState(
+                  title: 'Đang tải kế hoạch',
+                  subtitle:
+                      'Lịch trình, checklist và điểm đến đang được chuẩn bị.',
+                  icon: Icons.calendar_month_rounded,
+                );
               }
               if (widget.viewModel.plan == null) {
                 return const Center(child: Text('Không tìm thấy kế hoạch'));
@@ -100,9 +95,9 @@ class _PlanDetailPageState extends State<PlanDetailPage>
               return Column(
                 children: [
                   _buildAppBar(plan),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   _buildTabBar(),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Expanded(
                     child: TabBarView(
                       controller: _tabController,
@@ -117,11 +112,7 @@ class _PlanDetailPageState extends State<PlanDetailPage>
                           planName: plan.name,
                           readOnly: widget.viewModel.isViewMode,
                         ),
-                        LocationsTab(
-                          planId: widget.planId,
-                          planName: plan.name,
-                          refreshToken: _locationsRefreshToken,
-                        ),
+                        LocationsTab(viewModel: widget.viewModel),
                       ],
                     ),
                   ),
@@ -135,18 +126,19 @@ class _PlanDetailPageState extends State<PlanDetailPage>
   }
 
   Widget _buildAppBar(Plan plan) {
-    final status = plan.displayStatus;
-    final statusColor = _statusColor(status);
-    final dateFmt = DateFormat('dd/MM', 'vi');
+    final status = plan.statusBadgeLabel;
+    final statusColor = PlanUi.statusColor(plan);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _roundIconButton(
+          AppCircleIconButton(
             icon: Icons.arrow_back_ios_new_rounded,
             onTap: () => Navigator.pop(context, true),
+            backgroundColor: AppColors.white.withValues(alpha: 0.88),
+            borderColor: AppColors.divider.withValues(alpha: 0.7),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -157,7 +149,7 @@ class _PlanDetailPageState extends State<PlanDetailPage>
                   plan.name,
                   style: AppTextStyles.titleMedium.copyWith(
                     fontWeight: FontWeight.w800,
-                    fontSize: 20,
+                    fontSize: 18,
                     height: 1.2,
                   ),
                   softWrap: true,
@@ -170,12 +162,11 @@ class _PlanDetailPageState extends State<PlanDetailPage>
                     _buildStatusChip(status, statusColor),
                     _miniInfoChip(
                       icon: Icons.calendar_today_rounded,
-                      text:
-                          '${dateFmt.format(plan.startDate)} - ${dateFmt.format(plan.endDate)}',
+                      text: DateUi.shortDateRange(plan.startDate, plan.endDate),
                     ),
                     _miniInfoChip(
                       icon: Icons.timelapse_rounded,
-                      text: '${plan.totalDays} ngày',
+                      text: DateUi.dayCountLabel(plan.totalDays),
                     ),
                   ],
                 ),
@@ -220,7 +211,11 @@ class _PlanDetailPageState extends State<PlanDetailPage>
                 ),
               ),
             ],
-            child: _roundIconSurface(icon: Icons.more_horiz_rounded),
+            child: AppCircleIconSurface(
+              icon: Icons.more_horiz_rounded,
+              backgroundColor: AppColors.white.withValues(alpha: 0.88),
+              borderColor: AppColors.divider.withValues(alpha: 0.7),
+            ),
           ),
         ],
       ),
@@ -230,10 +225,10 @@ class _PlanDetailPageState extends State<PlanDetailPage>
   Widget _buildTabBar() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: AppColors.white.withValues(alpha: 0.75),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(13),
         border: Border.all(color: AppColors.divider.withValues(alpha: 0.8)),
       ),
       child: TabBar(
@@ -242,7 +237,7 @@ class _PlanDetailPageState extends State<PlanDetailPage>
         unselectedLabelColor: AppColors.textMedium,
         indicatorSize: TabBarIndicatorSize.tab,
         indicator: BoxDecoration(
-          borderRadius: BorderRadius.circular(11),
+          borderRadius: BorderRadius.circular(10),
           gradient: const LinearGradient(
             colors: [AppColors.primary, AppColors.primaryDeep],
           ),
@@ -257,117 +252,50 @@ class _PlanDetailPageState extends State<PlanDetailPage>
         dividerColor: Colors.transparent,
         labelStyle: AppTextStyles.bodySmall.copyWith(
           fontWeight: FontWeight.w700,
-          fontSize: 12,
+          fontSize: 11.5,
         ),
         unselectedLabelStyle: AppTextStyles.bodySmall.copyWith(
           fontWeight: FontWeight.w600,
-          fontSize: 12,
+          fontSize: 11.5,
         ),
         tabs: const [
           Tab(
-            icon: Icon(Icons.calendar_month_rounded, size: 17),
+            icon: Icon(Icons.calendar_month_rounded, size: 16),
             text: 'Lịch trình',
-            height: 48,
+            height: 42,
           ),
           Tab(
-            icon: Icon(Icons.checklist_rounded, size: 17),
+            icon: Icon(Icons.checklist_rounded, size: 16),
             text: 'Checklist',
-            height: 48,
+            height: 42,
           ),
           Tab(
-            icon: Icon(Icons.place_rounded, size: 17),
+            icon: Icon(Icons.place_rounded, size: 16),
             text: 'Điểm đến',
-            height: 48,
+            height: 42,
           ),
         ],
       ),
-    );
-  }
-
-  Widget _roundIconButton({
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: _roundIconSurface(icon: icon),
-      ),
-    );
-  }
-
-  Widget _roundIconSurface({required IconData icon}) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: AppColors.white.withValues(alpha: 0.88),
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.divider.withValues(alpha: 0.7)),
-      ),
-      child: Icon(icon, size: 18, color: AppColors.textDark),
     );
   }
 
   Widget _buildStatusChip(String status, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        status,
-        style: AppTextStyles.bodySmall.copyWith(
-          fontSize: 10.5,
-          fontWeight: FontWeight.w700,
-          color: color,
-        ),
-      ),
+    return AppBadgeChip(
+      label: status,
+      textColor: color,
+      backgroundColor: color.withValues(alpha: 0.12),
     );
   }
 
   Widget _miniInfoChip({required IconData icon, required String text}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.white.withValues(alpha: 0.84),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.divider.withValues(alpha: 0.75)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 11, color: AppColors.textMedium),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            style: AppTextStyles.bodySmall.copyWith(
-              color: AppColors.textMedium,
-              fontSize: 10.5,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
+    return AppBadgeChip(
+      label: text,
+      icon: icon,
+      textColor: AppColors.textMedium,
+      backgroundColor: AppColors.white.withValues(alpha: 0.84),
+      borderColor: AppColors.divider.withValues(alpha: 0.75),
+      fontWeight: FontWeight.w600,
     );
-  }
-
-  Color _statusColor(String status) {
-    switch (status) {
-      case 'Sắp diễn ra':
-        return AppColors.primary;
-      case 'Đang diễn ra':
-        return AppColors.success;
-      case 'Đã qua ngày':
-        return AppColors.goldDeep;
-      case 'Hoàn thành':
-        return AppColors.success;
-      default:
-        return AppColors.textLight;
-    }
   }
 
   Future<void> _handleMenuAction(String action) async {
@@ -375,32 +303,16 @@ class _PlanDetailPageState extends State<PlanDetailPage>
       case 'edit':
         final result = await Navigator.pushNamed(
           context,
-          '/plan/edit',
-          arguments: widget.planId,
+          AppRoutes.planEdit,
+          arguments: PlanEditRouteArgs(planId: widget.planId),
         );
         if (!mounted) return;
         if (result == true) {
           widget.viewModel.loadPlan(widget.planId);
-          ScaffoldMessenger.of(context).clearSnackBars();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Row(
-                children: [
-                  Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Cập nhật kế hoạch thành công',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
-              backgroundColor: AppColors.success,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              duration: const Duration(seconds: 3),
-            ),
+          AppFeedback.showSuccessSnack(
+            context,
+            'Cập nhật kế hoạch thành công',
+            duration: const Duration(seconds: 3),
           );
         }
         break;

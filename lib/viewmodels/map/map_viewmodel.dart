@@ -19,9 +19,9 @@ class MapViewModel extends ChangeNotifier {
     required IPlanRepository planRepo,
     required IActivityRepository activityRepo,
     required GeocodingService geocodingService,
-  })  : _planRepo = planRepo,
-        _activityRepo = activityRepo,
-        _geocodingService = geocodingService;
+  }) : _planRepo = planRepo,
+       _activityRepo = activityRepo,
+       _geocodingService = geocodingService;
 
   // ─── State ────────────────────────────────────────────
   List<MapMarkerData> _markers = [];
@@ -31,6 +31,8 @@ class MapViewModel extends ChangeNotifier {
   int _ongoingPlanCount = 0;
   bool _hasLoaded = false;
   int? _lastLoadedUserId;
+  int? _loadingUserId;
+  int _activeRequestId = 0;
 
   // ─── Getters ──────────────────────────────────────────
   List<MapMarkerData> get markers => _markers;
@@ -52,6 +54,12 @@ class MapViewModel extends ChangeNotifier {
     if (!force && _hasLoaded && _lastLoadedUserId == userId) {
       return;
     }
+    if (!force && _isLoading && _loadingUserId == userId) {
+      return;
+    }
+
+    final requestId = ++_activeRequestId;
+    _loadingUserId = userId;
 
     _isLoading = true;
     _errorMessage = null;
@@ -60,6 +68,8 @@ class MapViewModel extends ChangeNotifier {
 
     try {
       final plans = await _planRepo.getMyPlans(userId);
+      if (!_isActiveRequest(requestId)) return;
+
       final ongoingPlans = plans.where(_isPlanOngoing).toList();
       _ongoingPlanCount = ongoingPlans.length;
 
@@ -68,8 +78,6 @@ class MapViewModel extends ChangeNotifier {
         _unresolvedLocations = [];
         _hasLoaded = true;
         _lastLoadedUserId = userId;
-        _isLoading = false;
-        notifyListeners();
         return;
       }
 
@@ -82,10 +90,12 @@ class MapViewModel extends ChangeNotifier {
       for (final plan in ongoingPlans) {
         // Load full plan with days
         final fullPlan = await _planRepo.getById(plan.id);
+        if (!_isActiveRequest(requestId)) return;
         if (fullPlan == null) continue;
 
         for (final day in fullPlan.days) {
           final activities = await _activityRepo.getByPlanDayId(day.id);
+          if (!_isActiveRequest(requestId)) return;
           for (final activity in activities) {
             final rawLoc = activity.locationText?.trim();
             if (rawLoc != null && rawLoc.isNotEmpty) {
@@ -110,6 +120,7 @@ class MapViewModel extends ChangeNotifier {
       // Geocode từng địa điểm unique
       for (final bucket in locationBuckets.values) {
         final point = await _geocodingService.geocode(bucket.displayLocation);
+        if (!_isActiveRequest(requestId)) return;
         if (point != null) {
           _mergeResolvedBucket(mergedGroups, bucket, point);
         } else {
@@ -118,6 +129,7 @@ class MapViewModel extends ChangeNotifier {
 
         // Delay giữa mỗi geocode request (Nominatim rate limit)
         await Future.delayed(const Duration(milliseconds: 1100));
+        if (!_isActiveRequest(requestId)) return;
       }
 
       _markers = mergedGroups.map(_toMapMarker).toList();
@@ -125,15 +137,20 @@ class MapViewModel extends ChangeNotifier {
       _hasLoaded = true;
       _lastLoadedUserId = userId;
     } catch (e) {
+      if (!_isActiveRequest(requestId)) return;
       _errorMessage = 'Không thể tải dữ liệu bản đồ';
       debugPrint('❌ MapViewModel error: $e');
+    } finally {
+      if (_isActiveRequest(requestId)) {
+        _isLoading = false;
+        _loadingUserId = null;
+        notifyListeners();
+      }
     }
-
-    _isLoading = false;
-    notifyListeners();
   }
 
   void clear() {
+    _activeRequestId++;
     _markers = [];
     _unresolvedLocations = [];
     _errorMessage = null;
@@ -141,6 +158,7 @@ class MapViewModel extends ChangeNotifier {
     _ongoingPlanCount = 0;
     _hasLoaded = false;
     _lastLoadedUserId = null;
+    _loadingUserId = null;
     notifyListeners();
   }
 
@@ -148,6 +166,8 @@ class MapViewModel extends ChangeNotifier {
     _hasLoaded = false;
     _lastLoadedUserId = null;
   }
+
+  bool _isActiveRequest(int requestId) => requestId == _activeRequestId;
 
   bool _isPlanOngoing(Plan plan) {
     // Cho phép hiển thị cả plan đã bấm "hoàn thành" miễn là đang trong khung ngày.
@@ -224,9 +244,7 @@ class MapViewModel extends ChangeNotifier {
 class _ActivityInfo {
   final String title;
 
-  const _ActivityInfo({
-    required this.title,
-  });
+  const _ActivityInfo({required this.title});
 }
 
 class _LocationBucket {

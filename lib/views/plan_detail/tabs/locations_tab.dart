@@ -1,157 +1,92 @@
 import 'package:flutter/material.dart';
 import 'package:du_xuan/core/constants/app_colors.dart';
 import 'package:du_xuan/core/constants/app_text_styles.dart';
-import 'package:du_xuan/di.dart';
+import 'package:du_xuan/core/utils/date_ui.dart';
 import 'package:du_xuan/domain/entities/activity.dart';
 import 'package:du_xuan/domain/entities/plan_day.dart';
+import 'package:du_xuan/viewmodels/itinerary/itinerary_viewmodel.dart';
 import 'package:du_xuan/views/itinerary/location_action_sheet.dart';
-import 'package:intl/intl.dart';
+import 'package:du_xuan/views/shared/widgets/app_empty_state.dart';
+import 'package:du_xuan/views/shared/widgets/app_loading_state.dart';
 
-/// Tab 3: Tất cả địa điểm của plan, nhóm theo ngày
-class LocationsTab extends StatefulWidget {
-  final int planId;
-  final String planName;
-  final int refreshToken;
+/// Tab 3: Tất cả địa điểm của plan, nhóm theo ngày.
+class LocationsTab extends StatelessWidget {
+  final ItineraryViewModel viewModel;
 
-  const LocationsTab({
-    super.key,
-    required this.planId,
-    required this.planName,
-    this.refreshToken = 0,
-  });
-
-  @override
-  State<LocationsTab> createState() => _LocationsTabState();
-}
-
-class _LocationsTabState extends State<LocationsTab> {
-  bool _isLoading = true;
-  Map<PlanDay, List<Activity>> _daysWithLocations = {};
-
-  @override
-  void initState() {
-    super.initState();
-    _loadData();
-  }
-
-  @override
-  void didUpdateWidget(covariant LocationsTab oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    final shouldReload = oldWidget.planId != widget.planId ||
-        oldWidget.refreshToken != widget.refreshToken;
-    if (shouldReload) {
-      _loadData(showLoading: true);
-    }
-  }
-
-  Future<void> _loadData({bool showLoading = false}) async {
-    if (showLoading && mounted) {
-      setState(() {
-        _isLoading = true;
-      });
-    }
-
-    try {
-      final planRepo = buildPlanRepository();
-      final activityRepo = buildActivityRepository();
-      final plan = await planRepo.getById(widget.planId);
-      if (plan == null) {
-        if (mounted) {
-          setState(() {
-            _daysWithLocations = {};
-            _isLoading = false;
-          });
-        }
-        return;
-      }
-
-      final result = <PlanDay, List<Activity>>{};
-      for (final day in plan.days) {
-        final activities = await activityRepo.getByPlanDayId(day.id);
-        final withLocation = activities
-            .where((a) => a.locationText != null && a.locationText!.isNotEmpty)
-            .toList();
-        if (withLocation.isNotEmpty) {
-          result[day] = withLocation;
-        }
-      }
-
-      if (mounted) {
-        setState(() {
-          _daysWithLocations = result;
-          _isLoading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
+  const LocationsTab({super.key, required this.viewModel});
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    return ListenableBuilder(
+      listenable: viewModel,
+      builder: (context, _) {
+        final groupedLocations = _buildDaysWithLocations();
 
-    if (_daysWithLocations.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Icon(Icons.place_rounded,
-                  size: 30, color: AppColors.primary),
-            ),
-            const SizedBox(height: 16),
-            Text('Chưa có địa điểm nào', style: AppTextStyles.titleMedium),
-            const SizedBox(height: 6),
-            Text(
-              'Thêm địa điểm khi tạo hoạt động',
-              style: AppTextStyles.bodySmall,
-            ),
-          ],
-        ),
-      );
-    }
+        if (viewModel.isLoading && viewModel.plan == null) {
+          return const AppLoadingState(
+            title: 'Đang tải địa điểm',
+            subtitle: 'Tổng hợp các điểm đến từ lịch trình hiện tại.',
+            icon: Icons.place_rounded,
+            compact: true,
+          );
+        }
 
-    final dateFmt = DateFormat('dd/MM');
-    final sortedDays = _daysWithLocations.keys.toList()
-      ..sort((a, b) => a.dayNumber.compareTo(b.dayNumber));
+        if (groupedLocations.isEmpty) {
+          return const AppEmptyState(
+            icon: Icons.place_rounded,
+            title: 'Chưa có địa điểm nào',
+            subtitle: 'Thêm địa điểm khi tạo hoạt động.',
+            accentColor: AppColors.primary,
+          );
+        }
 
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-      itemCount: sortedDays.length,
-      itemBuilder: (context, i) {
-        final day = sortedDays[i];
-        final activities = _daysWithLocations[day]!;
-        return _daySection(day, activities, dateFmt);
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          itemCount: groupedLocations.length,
+          itemBuilder: (context, index) {
+            final entry = groupedLocations[index];
+            return _daySection(entry.$1, entry.$2, context);
+          },
+        );
       },
     );
   }
 
+  List<(PlanDay, List<Activity>)> _buildDaysWithLocations() {
+    final entries = <(PlanDay, List<Activity>)>[];
+
+    for (final day in viewModel.days) {
+      final withLocation = viewModel.activitiesForDay(day.id).where((activity) {
+        final location = activity.locationText?.trim();
+        return location != null && location.isNotEmpty;
+      }).toList();
+
+      if (withLocation.isNotEmpty) {
+        entries.add((day, withLocation));
+      }
+    }
+
+    entries.sort((a, b) => a.$1.dayNumber.compareTo(b.$1.dayNumber));
+    return entries;
+  }
+
   Widget _daySection(
-      PlanDay day, List<Activity> activities, DateFormat dateFmt) {
+    PlanDay day,
+    List<Activity> activities,
+    BuildContext context,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Day header
         Padding(
           padding: const EdgeInsets.only(top: 12, bottom: 8),
           child: Row(
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
@@ -168,29 +103,29 @@ class _LocationsTabState extends State<LocationsTab> {
               ),
               const SizedBox(width: 8),
               Text(
-                dateFmt.format(day.date),
-                style: AppTextStyles.bodySmall
-                    .copyWith(color: AppColors.textMedium),
+                DateUi.shortDate(day.date),
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.textMedium,
+                ),
               ),
               const SizedBox(width: 8),
-              Expanded(
-                child: Container(height: 1, color: AppColors.divider),
-              ),
+              Expanded(child: Container(height: 1, color: AppColors.divider)),
             ],
           ),
         ),
-        // Activity cards
-        ...activities.map((a) => _locationCard(a)),
+        ...activities.map((activity) => _locationCard(activity, context)),
       ],
     );
   }
 
-  Widget _locationCard(Activity activity) {
+  Widget _locationCard(Activity activity, BuildContext context) {
     return GestureDetector(
       onTap: () {
+        final location = activity.locationText;
+        if (location == null || location.isEmpty) return;
         LocationActionSheet.show(
           context: context,
-          locationText: activity.locationText!,
+          locationText: location,
           activityTitle: activity.title,
         );
       },
@@ -210,7 +145,6 @@ class _LocationsTabState extends State<LocationsTab> {
         ),
         child: Row(
           children: [
-            // Activity type icon
             Container(
               width: 38,
               height: 38,
@@ -218,25 +152,31 @@ class _LocationsTabState extends State<LocationsTab> {
                 color: AppColors.primary.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.place_rounded,
-                  size: 18, color: AppColors.primary),
+              child: const Icon(
+                Icons.place_rounded,
+                size: 18,
+                color: AppColors.primary,
+              ),
             ),
             const SizedBox(width: 14),
-            // Details
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     activity.locationText!,
-                    style: AppTextStyles.bodyLarge
-                        .copyWith(fontWeight: FontWeight.w600),
+                    style: AppTextStyles.bodyLarge.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.event_note_rounded,
-                          size: 14, color: AppColors.textLight),
+                      const Icon(
+                        Icons.event_note_rounded,
+                        size: 14,
+                        color: AppColors.textLight,
+                      ),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(

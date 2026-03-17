@@ -1,6 +1,7 @@
 import 'package:du_xuan/data/implementations/api/activity_api.dart';
 import 'package:du_xuan/data/implementations/api/auth_api.dart';
 import 'package:du_xuan/data/implementations/api/checklist_api.dart';
+import 'package:du_xuan/data/implementations/api/geocoding_service.dart';
 import 'package:du_xuan/data/implementations/api/notification_api.dart';
 import 'package:du_xuan/data/implementations/api/openai_service.dart';
 import 'package:du_xuan/data/implementations/api/plan_api.dart';
@@ -27,28 +28,31 @@ import 'package:du_xuan/viewmodels/plan/plan_form_viewmodel.dart';
 import 'package:du_xuan/viewmodels/plan/plan_list_viewmodel.dart';
 import 'package:du_xuan/viewmodels/register/register_viewmodel.dart';
 import 'package:du_xuan/viewmodels/settings/change_password_viewmodel.dart';
-import 'package:du_xuan/data/implementations/api/geocoding_service.dart';
 import 'package:du_xuan/viewmodels/map/map_viewmodel.dart';
+
+AppDatabase get _db => AppDatabase.instance;
 
 // ─── Auth ──────────────────────────────────────────────
 
-AuthRepository buildAuthRepository() {
-  // Sử dụng SQLite Auth local
-  final api = AuthApi(AppDatabase.instance);
+AuthRepository _buildAuthRepository() {
+  final api = AuthApi(_db);
   final mapper = AuthSessionMapper();
   return AuthRepository(api: api, mapper: mapper);
 }
 
-LoginViewModel buildLoginVM() => LoginViewModel(buildAuthRepository());
-RegisterViewModel buildRegisterVM() => RegisterViewModel(buildAuthRepository());
-HomeViewModel buildHomeVM() => HomeViewModel(buildAuthRepository());
+AuthRepository buildAuthRepository() => _buildAuthRepository();
+
+LoginViewModel buildLoginVM() => LoginViewModel(_buildAuthRepository());
+RegisterViewModel buildRegisterVM() =>
+    RegisterViewModel(_buildAuthRepository());
+HomeViewModel buildHomeVM() => HomeViewModel(_buildAuthRepository());
 ChangePasswordViewModel buildChangePasswordVM() =>
-    ChangePasswordViewModel(buildAuthRepository());
+    ChangePasswordViewModel(_buildAuthRepository());
 
 // ─── Plan ──────────────────────────────────────────────
 
 PlanRepository _buildPlanRepository() {
-  final api = PlanApi(AppDatabase.instance);
+  final api = PlanApi(_db);
   final planMapper = PlanMapper();
   final dayMapper = PlanDayMapper();
   return PlanRepository(api: api, planMapper: planMapper, dayMapper: dayMapper);
@@ -63,16 +67,16 @@ PlanRepository buildPlanRepository() => _buildPlanRepository();
 // ─── Itinerary ─────────────────────────────────────────
 
 ActivityRepository _buildActivityRepository() {
-  final api = ActivityApi(AppDatabase.instance);
+  final api = ActivityApi(_db);
   final mapper = ActivityMapper();
   return ActivityRepository(api: api, mapper: mapper);
 }
 
 ItineraryViewModel buildItineraryVM() => ItineraryViewModel(
-      planRepo: _buildPlanRepository(),
-      activityRepo: _buildActivityRepository(),
-      notificationService: buildNotificationService(),
-    );
+  planRepo: _buildPlanRepository(),
+  activityRepo: _buildActivityRepository(),
+  notificationService: buildNotificationService(),
+);
 
 ActivityFormViewModel buildActivityFormVM() =>
     ActivityFormViewModel(_buildActivityRepository());
@@ -81,7 +85,7 @@ ActivityRepository buildActivityRepository() => _buildActivityRepository();
 // ─── Checklist ─────────────────────────────────────────
 
 ChecklistRepository _buildChecklistRepository() {
-  final api = ChecklistApi(AppDatabase.instance);
+  final api = ChecklistApi(_db);
   final mapper = ChecklistMapper();
   return ChecklistRepository(api: api, mapper: mapper);
 }
@@ -91,7 +95,7 @@ ChecklistViewModel buildChecklistVM() =>
 ChecklistRepository buildChecklistRepository() => _buildChecklistRepository();
 
 NotificationRepository _buildNotificationRepository() {
-  final api = NotificationApi(AppDatabase.instance);
+  final api = NotificationApi(_db);
   final mapper = NotificationMapper();
   return NotificationRepository(api: api, mapper: mapper);
 }
@@ -100,30 +104,34 @@ NotificationRepository buildNotificationRepository() =>
     _buildNotificationRepository();
 
 NotificationViewModel buildNotificationVM() =>
-    NotificationViewModel(buildNotificationRepository());
+    NotificationViewModel(_buildNotificationRepository());
 
 NotificationService? _notificationService;
 
 NotificationService buildNotificationService() {
   _notificationService ??= NotificationService(
-    notificationRepo: buildNotificationRepository(),
+    notificationRepo: _buildNotificationRepository(),
   );
   return _notificationService!;
 }
 
 // ─── AI Suggestion ─────────────────────────────────────
 
+OpenAiService _buildOpenAiService() => OpenAiService();
+
 SuggestionViewModel buildSuggestionVM() => SuggestionViewModel(
-      planRepo: _buildPlanRepository(),
-      activityRepo: _buildActivityRepository(),
-      checklistRepo: _buildChecklistRepository(),
-      openAiService: OpenAiService(),
-    );
+  planRepo: _buildPlanRepository(),
+  activityRepo: _buildActivityRepository(),
+  checklistRepo: _buildChecklistRepository(),
+  openAiService: _buildOpenAiService(),
+);
 
 // ─── Map ───────────────────────────────────────────────
 
+GeocodingService _buildGeocodingService() => GeocodingService();
+
 MapViewModel buildMapVM() => MapViewModel(
-      planRepo: _buildPlanRepository(),
-      activityRepo: _buildActivityRepository(),
-      geocodingService: GeocodingService(),
-    );
+  planRepo: _buildPlanRepository(),
+  activityRepo: _buildActivityRepository(),
+  geocodingService: _buildGeocodingService(),
+);

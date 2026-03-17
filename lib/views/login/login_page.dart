@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:du_xuan/core/constants/app_colors.dart';
+import 'package:du_xuan/routes/app_routes.dart';
 import 'package:du_xuan/viewmodels/login/login_viewmodel.dart';
 import 'package:du_xuan/views/auth/widgets/auth_ui.dart';
 
@@ -26,10 +27,7 @@ class _LoginPageState extends State<LoginPage>
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
-    _formFade = CurvedAnimation(
-      parent: _formAnim,
-      curve: Curves.easeOutCubic,
-    );
+    _formFade = CurvedAnimation(parent: _formAnim, curve: Curves.easeOutCubic);
     _formSlide = Tween<Offset>(
       begin: const Offset(0, 0.06),
       end: Offset.zero,
@@ -115,7 +113,7 @@ class _LoginPageState extends State<LoginPage>
           AuthLinkRow(
             leadingText: 'Chưa có tài khoản? ',
             linkText: 'Đăng ký',
-            onTap: () => Navigator.pushNamed(context, '/register'),
+            onTap: () => Navigator.pushNamed(context, AppRoutes.register),
           ),
         ],
       ),
@@ -128,7 +126,7 @@ class _LoginPageState extends State<LoginPage>
       _passCtrl.text,
     );
     if (session != null && mounted) {
-      Navigator.pushReplacementNamed(context, '/home');
+      Navigator.pushReplacementNamed(context, AppRoutes.home);
     }
   }
 }

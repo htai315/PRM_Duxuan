@@ -1,15 +1,27 @@
 import 'package:du_xuan/data/dtos/plan/plan_dto.dart';
+import 'package:du_xuan/data/dtos/plan/plan_activity_progress_dto.dart';
 import 'package:du_xuan/data/dtos/plan/plan_day_dto.dart';
 import 'package:du_xuan/data/dtos/plan/create_plan_request_dto.dart';
 import 'package:du_xuan/data/dtos/plan/update_plan_request_dto.dart';
 
 abstract class IPlanApi {
+  /// Chạy một nhóm thao tác plan trong cùng transaction.
+  Future<T> runInTransaction<T>(Future<T> Function(IPlanApi api) action);
+
   /// Lấy tất cả plan của 1 user
   Future<List<PlanDto>> getByUserId(int userId);
 
   /// Lấy plan phân trang của 1 user
   Future<(List<PlanDto> items, int totalCount)> getByUserIdPaged(
-      int userId, int page, int pageSize);
+    int userId,
+    int page,
+    int pageSize,
+  );
+
+  /// Lấy summary completion activity cho nhiều plan.
+  Future<List<PlanActivityProgressDto>> getActivityProgressByPlanIds(
+    List<int> planIds,
+  );
 
   /// Lấy plan theo id
   Future<PlanDto?> getById(int id);

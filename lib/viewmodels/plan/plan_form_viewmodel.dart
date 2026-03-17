@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:du_xuan/core/enums/plan_status.dart';
+import 'package:du_xuan/core/utils/app_form_validators.dart';
 import 'package:du_xuan/core/utils/notification_service.dart';
 import 'package:du_xuan/data/interfaces/repositories/i_plan_repository.dart';
 import 'package:du_xuan/domain/entities/plan.dart';
@@ -54,27 +55,24 @@ class PlanFormViewModel extends ChangeNotifier {
     String? participants,
     String? note,
   }) async {
-    // ─── Validation ─────────────────────────────────
-    if (name.trim().isEmpty) {
-      _errorMessage = 'Vui lòng nhập tên kế hoạch';
+    final nameError = AppFormValidators.validatePlanName(name);
+    if (nameError != null) {
+      _errorMessage = nameError;
       notifyListeners();
       return null;
     }
-    if (startDate == null) {
-      _errorMessage = 'Vui lòng chọn ngày bắt đầu';
+
+    final dateError = AppFormValidators.validatePlanDateRange(
+      startDate,
+      endDate,
+    );
+    if (dateError != null) {
+      _errorMessage = dateError;
       notifyListeners();
       return null;
     }
-    if (endDate == null) {
-      _errorMessage = 'Vui lòng chọn ngày kết thúc';
-      notifyListeners();
-      return null;
-    }
-    if (endDate.isBefore(startDate)) {
-      _errorMessage = 'Ngày kết thúc phải sau ngày bắt đầu';
-      notifyListeners();
-      return null;
-    }
+    final validatedStartDate = startDate!;
+    final validatedEndDate = endDate!;
 
     _isLoading = true;
     _errorMessage = null;
@@ -86,8 +84,8 @@ class PlanFormViewModel extends ChangeNotifier {
         userId: isEditMode ? _existingPlan!.userId : userId,
         name: name.trim(),
         description: description?.trim(),
-        startDate: startDate,
-        endDate: endDate,
+        startDate: validatedStartDate,
+        endDate: validatedEndDate,
         participants: participants?.trim(),
         note: note?.trim(),
         status: _existingPlan?.status ?? PlanStatus.active,

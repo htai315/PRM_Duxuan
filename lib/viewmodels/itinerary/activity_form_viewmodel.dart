@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:du_xuan/core/enums/activity_status.dart';
 import 'package:du_xuan/core/enums/activity_type.dart';
+import 'package:du_xuan/core/utils/app_form_validators.dart';
 import 'package:du_xuan/data/interfaces/repositories/i_activity_repository.dart';
 import 'package:du_xuan/domain/entities/activity.dart';
 
@@ -39,25 +40,32 @@ class ActivityFormViewModel extends ChangeNotifier {
     String? endTime,
     String? locationText,
     String? note,
-    double? estimatedCost,
+    String? estimatedCostText,
   }) async {
-    // ── Validation ──
-    if (title.trim().isEmpty) {
-      _errorMessage = 'Vui lòng nhập tiêu đề hoạt động';
+    final titleError = AppFormValidators.validateActivityTitle(title);
+    if (titleError != null) {
+      _errorMessage = titleError;
       notifyListeners();
       return null;
     }
 
-    // BR-I02: end_time > start_time
-    if (startTime != null &&
-        startTime.isNotEmpty &&
-        endTime != null &&
-        endTime.isNotEmpty) {
-      if (endTime.compareTo(startTime) <= 0) {
-        _errorMessage = 'Giờ kết thúc phải sau giờ bắt đầu';
-        notifyListeners();
-        return null;
-      }
+    final timeError = AppFormValidators.validateActivityTimeRange(
+      startTime,
+      endTime,
+    );
+    if (timeError != null) {
+      _errorMessage = timeError;
+      notifyListeners();
+      return null;
+    }
+
+    final costResult = AppFormValidators.parseEstimatedCost(
+      estimatedCostText ?? '',
+    );
+    if (!costResult.isValid) {
+      _errorMessage = costResult.errorMessage;
+      notifyListeners();
+      return null;
     }
 
     _isLoading = true;
@@ -74,7 +82,7 @@ class ActivityFormViewModel extends ChangeNotifier {
         endTime: endTime?.isNotEmpty == true ? endTime : null,
         locationText: locationText?.trim(),
         note: note?.trim(),
-        estimatedCost: estimatedCost,
+        estimatedCost: costResult.value,
         priority: _existingActivity?.priority ?? 0,
         orderIndex: _existingActivity?.orderIndex ?? 0,
         status: _existingActivity?.status ?? ActivityStatus.todo,

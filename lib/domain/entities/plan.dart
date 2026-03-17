@@ -1,4 +1,5 @@
 import 'package:du_xuan/core/enums/plan_status.dart';
+import 'package:du_xuan/core/enums/plan_timeline_state.dart';
 import 'package:du_xuan/domain/entities/plan_day.dart';
 
 class Plan {
@@ -35,18 +36,31 @@ class Plan {
   /// Số ngày trong kế hoạch
   int get totalDays => endDate.difference(startDate).inDays + 1;
 
-  /// Trạng thái hiển thị (computed, không lưu DB)
-  String get displayStatus {
-    if (status == PlanStatus.completed) return 'Hoàn thành';
-
+  /// Trạng thái timeline tính từ ngày, độc lập với lifecycle status trong DB.
+  PlanTimelineState get timelineState {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final start = DateTime(startDate.year, startDate.month, startDate.day);
     final end = DateTime(endDate.year, endDate.month, endDate.day);
 
-    if (today.isBefore(start)) return 'Sắp diễn ra';
-    if (today.isAfter(end)) return 'Đã qua ngày';
-    return 'Đang diễn ra';
+    if (today.isBefore(start)) return PlanTimelineState.upcoming;
+    if (today.isAfter(end)) return PlanTimelineState.pastDue;
+    return PlanTimelineState.ongoing;
+  }
+
+  String get timelineLabel => timelineState.label;
+
+  /// Nhãn status hiển thị cho UI: lifecycle cho completed/draft/archived,
+  /// timeline cho active.
+  String get statusBadgeLabel {
+    switch (status) {
+      case PlanStatus.active:
+        return timelineLabel;
+      case PlanStatus.draft:
+      case PlanStatus.completed:
+      case PlanStatus.archived:
+        return status.label;
+    }
   }
 
   /// Bản sao với thay đổi

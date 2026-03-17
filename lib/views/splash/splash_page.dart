@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:du_xuan/core/constants/app_colors.dart';
 import 'package:du_xuan/core/constants/app_text_styles.dart';
 import 'package:du_xuan/data/interfaces/repositories/iauth_repository.dart';
+import 'package:du_xuan/routes/app_routes.dart';
 
 /// Splash screen — check session rồi redirect sang Home hoặc Login.
 class SplashPage extends StatefulWidget {
@@ -26,14 +27,16 @@ class _SplashPageState extends State<SplashPage> {
 
       if (session != null) {
         // Có session → vào Home
-        Navigator.pushReplacementNamed(context, '/home');
+        Navigator.pushReplacementNamed(context, AppRoutes.home);
       } else {
         // Không có session → vào Login
-        Navigator.pushReplacementNamed(context, '/login');
+        Navigator.pushReplacementNamed(context, AppRoutes.login);
       }
     } catch (e) {
       debugPrint('❌ Splash checkSession error: $e');
-      if (mounted) Navigator.pushReplacementNamed(context, '/login');
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, AppRoutes.login);
+      }
     }
   }
 
@@ -69,8 +72,11 @@ class _SplashPageState extends State<SplashPage> {
                   ),
                 ],
               ),
-              child: const Icon(Icons.temple_buddhist_rounded,
-                  size: 38, color: Colors.white),
+              child: const Icon(
+                Icons.temple_buddhist_rounded,
+                size: 38,
+                color: Colors.white,
+              ),
             ),
             const SizedBox(height: 20),
             Text('Du Xuân', style: AppTextStyles.displayLarge),

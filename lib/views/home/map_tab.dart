@@ -6,13 +6,21 @@ import 'package:du_xuan/core/constants/app_colors.dart';
 import 'package:du_xuan/core/constants/app_text_styles.dart';
 import 'package:du_xuan/core/utils/maps_launcher.dart';
 import 'package:du_xuan/domain/entities/map_marker_data.dart';
+import 'package:du_xuan/routes/app_routes.dart';
+import 'package:du_xuan/routes/route_args.dart';
 import 'package:du_xuan/viewmodels/map/map_viewmodel.dart';
 
 class MapTab extends StatefulWidget {
   final MapViewModel viewModel;
   final int userId;
+  final Future<void> Function(int planId)? onOpenPlanDetail;
 
-  const MapTab({super.key, required this.viewModel, required this.userId});
+  const MapTab({
+    super.key,
+    required this.viewModel,
+    required this.userId,
+    this.onOpenPlanDetail,
+  });
 
   @override
   State<MapTab> createState() => _MapTabState();
@@ -218,8 +226,10 @@ class _MapTabState extends State<MapTab> {
                     ),
                     _headerActionButton(
                       icon: Icons.refresh_rounded,
-                      onTap: () =>
-                          widget.viewModel.loadMarkers(widget.userId, force: true),
+                      onTap: () => widget.viewModel.loadMarkers(
+                        widget.userId,
+                        force: true,
+                      ),
                     ),
                     const SizedBox(width: 6),
                     _headerActionButton(
@@ -527,17 +537,21 @@ class _MapTabState extends State<MapTab> {
                 Expanded(
                   child: TextButton.icon(
                     onPressed: () async {
-                      await Navigator.pushNamed(
-                        context,
-                        '/itinerary',
-                        arguments: marker.planId,
-                      );
+                      if (widget.onOpenPlanDetail != null) {
+                        await widget.onOpenPlanDetail!(marker.planId);
+                      } else {
+                        await Navigator.pushNamed(
+                          context,
+                          AppRoutes.itinerary,
+                          arguments: ItineraryRouteArgs(planId: marker.planId),
+                        );
 
-                      if (!mounted) return;
-                      await widget.viewModel.loadMarkers(
-                        widget.userId,
-                        force: true,
-                      );
+                        if (!mounted) return;
+                        await widget.viewModel.loadMarkers(
+                          widget.userId,
+                          force: true,
+                        );
+                      }
                       if (!mounted) return;
                       setState(() => _selectedMarker = null);
                     },

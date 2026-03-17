@@ -2,11 +2,14 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:du_xuan/core/enums/plan_status.dart';
 import 'package:du_xuan/core/enums/notification_type.dart';
 import 'package:du_xuan/data/interfaces/repositories/i_notification_repository.dart';
 import 'package:du_xuan/domain/entities/app_notification.dart';
 import 'package:du_xuan/domain/entities/plan.dart';
+import 'package:du_xuan/routes/app_routes.dart';
+import 'package:du_xuan/routes/route_args.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -34,8 +37,8 @@ class NotificationService {
   NotificationService({
     required INotificationRepository notificationRepo,
     FlutterLocalNotificationsPlugin? plugin,
-  })  : _notificationRepo = notificationRepo,
-        _plugin = plugin ?? FlutterLocalNotificationsPlugin() {
+  }) : _notificationRepo = notificationRepo,
+       _plugin = plugin ?? FlutterLocalNotificationsPlugin() {
     instance = this;
   }
 
@@ -43,13 +46,11 @@ class NotificationService {
     if (_initialized) return;
 
     tz.initializeTimeZones();
-    try {
-      tz.setLocalLocation(tz.getLocation('Asia/Ho_Chi_Minh'));
-    } catch (_) {
-      // Fallback giữ timezone mặc định của package nếu location không tồn tại.
-    }
+    await _configureLocalTimezone();
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const darwinSettings = DarwinInitializationSettings();
     const initSettings = InitializationSettings(
       android: androidSettings,
@@ -72,6 +73,16 @@ class NotificationService {
     }
 
     _initialized = true;
+  }
+
+  Future<void> _configureLocalTimezone() async {
+    try {
+      final localTimezone = await FlutterTimezone.getLocalTimezone();
+      tz.setLocalLocation(tz.getLocation(localTimezone.identifier));
+    } catch (e) {
+      debugPrint('Notification timezone init fallback: $e');
+      // Fallback giữ timezone mặc định của package nếu không resolve được.
+    }
   }
 
   Future<void> requestPermissions() async {
@@ -221,7 +232,8 @@ class NotificationService {
     final eventKey = 'test:${now.millisecondsSinceEpoch}';
     final notificationId = _buildTestNotificationId(now);
     final title = 'Thông báo kiểm thử';
-    final body = 'Nếu bạn thấy thông báo này, lịch nhắc đang hoạt động bình thường.';
+    final body =
+        'Nếu bạn thấy thông báo này, lịch nhắc đang hoạt động bình thường.';
     final payload = jsonEncode({'eventKey': eventKey});
 
     await _notificationRepo.deleteByEventKey(eventKey);
@@ -328,14 +340,21 @@ class NotificationService {
     final nav = navigatorKey.currentState;
     if (nav == null) return;
     _pendingPlanId = null;
-    nav.pushNamed('/itinerary', arguments: planId);
+    nav.pushNamed(
+      AppRoutes.itinerary,
+      arguments: ItineraryRouteArgs(planId: planId),
+    );
   }
 
   bool _shouldSchedule(Plan plan) {
     if (plan.status != PlanStatus.active) return false;
     final today = DateTime.now();
     final todayDate = DateTime(today.year, today.month, today.day);
-    final start = DateTime(plan.startDate.year, plan.startDate.month, plan.startDate.day);
+    final start = DateTime(
+      plan.startDate.year,
+      plan.startDate.month,
+      plan.startDate.day,
+    );
     return !start.isBefore(todayDate);
   }
 
@@ -401,7 +420,10 @@ class NotificationService {
       if (planId != null) {
         final nav = navigatorKey.currentState;
         if (nav != null) {
-          nav.pushNamed('/itinerary', arguments: planId);
+          nav.pushNamed(
+            AppRoutes.itinerary,
+            arguments: ItineraryRouteArgs(planId: planId),
+          );
         } else {
           _pendingPlanId = planId;
         }

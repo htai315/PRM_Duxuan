@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:du_xuan/core/enums/plan_status.dart';
 import 'package:du_xuan/core/utils/notification_service.dart';
 import 'package:du_xuan/core/utils/pagination_utils.dart';
 import 'package:du_xuan/data/interfaces/repositories/i_plan_repository.dart';
 import 'package:du_xuan/domain/entities/plan.dart';
+import 'package:du_xuan/domain/entities/plan_activity_progress.dart';
 
 class PlanListViewModel extends ChangeNotifier {
   final IPlanRepository _repository;
@@ -12,6 +14,7 @@ class PlanListViewModel extends ChangeNotifier {
 
   // ─── State ────────────────────────────────────────────
   List<Plan> _plans = [];
+  Map<int, PlanActivityProgress> _activityProgressByPlanId = {};
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -29,6 +32,23 @@ class PlanListViewModel extends ChangeNotifier {
   bool get hasMore => _hasMore;
   bool get isLoadingMore => _isLoadingMore;
 
+  PlanActivityProgress activityProgressForPlan(int planId) {
+    return _activityProgressByPlanId[planId] ??
+        PlanActivityProgress.empty(planId);
+  }
+
+  double progressForPlan(Plan plan) {
+    switch (plan.status) {
+      case PlanStatus.completed:
+        return 1.0;
+      case PlanStatus.active:
+        return activityProgressForPlan(plan.id).progress;
+      case PlanStatus.draft:
+      case PlanStatus.archived:
+        return 0.0;
+    }
+  }
+
   // ─── Actions ──────────────────────────────────────────
 
   Future<void> loadPlans(int userId, {bool refresh = false}) async {
@@ -36,6 +56,7 @@ class PlanListViewModel extends ChangeNotifier {
       _currentPage = 1;
       _hasMore = true;
       _plans = [];
+      _activityProgressByPlanId = {};
     }
 
     _isLoading = true;
@@ -44,8 +65,16 @@ class PlanListViewModel extends ChangeNotifier {
 
     try {
       if (_hasMore) {
-        final result = await _repository.getMyPlansPaged(userId, _currentPage, _pageSize);
+        final result = await _repository.getMyPlansPaged(
+          userId,
+          _currentPage,
+          _pageSize,
+        );
         _plans = result.items;
+        _activityProgressByPlanId = await _repository
+            .getActivityProgressByPlanIds(
+              result.items.map((plan) => plan.id).toList(),
+            );
         _hasMore = result.hasMore;
       }
     } catch (e) {
@@ -64,9 +93,17 @@ class PlanListViewModel extends ChangeNotifier {
 
     try {
       final nextPage = _currentPage + 1;
-      final result = await _repository.getMyPlansPaged(userId, nextPage, _pageSize);
-      
+      final result = await _repository.getMyPlansPaged(
+        userId,
+        nextPage,
+        _pageSize,
+      );
+      final activityProgress = await _repository.getActivityProgressByPlanIds(
+        result.items.map((plan) => plan.id).toList(),
+      );
+
       _plans.addAll(result.items);
+      _activityProgressByPlanId.addAll(activityProgress);
       _currentPage = nextPage;
       _hasMore = result.hasMore;
     } catch (e) {
@@ -86,6 +123,7 @@ class PlanListViewModel extends ChangeNotifier {
         debugPrint('Notification cleanup error (plan $id): $e');
       }
       _plans.removeWhere((p) => p.id == id);
+      _activityProgressByPlanId.remove(id);
       notifyListeners();
       return true;
     } catch (e) {

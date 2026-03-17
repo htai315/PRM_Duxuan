@@ -23,8 +23,7 @@ class ChecklistViewModel extends ChangeNotifier {
   int get packedCount => _items.where((i) => i.isPacked).length;
 
   /// Phần trăm tiến trình 0.0 → 1.0
-  double get progressPercent =>
-      totalCount == 0 ? 0 : packedCount / totalCount;
+  double get progressPercent => totalCount == 0 ? 0 : packedCount / totalCount;
 
   /// Nhóm items theo category
   Map<ChecklistCategory, List<ChecklistItem>> get groupedByCategory {
@@ -43,6 +42,8 @@ class ChecklistViewModel extends ChangeNotifier {
 
     try {
       _items = await _repository.getByPlanId(planId);
+      _sortItems();
+      _errorMessage = null;
     } catch (e) {
       _errorMessage = e.toString().replaceFirst('Exception: ', '');
     }
@@ -76,6 +77,8 @@ class ChecklistViewModel extends ChangeNotifier {
       );
       final created = await _repository.create(item);
       _items.add(created);
+      _sortItems();
+      _errorMessage = null;
       notifyListeners();
       return created;
     } catch (e) {
@@ -90,6 +93,8 @@ class ChecklistViewModel extends ChangeNotifier {
       await _repository.update(item);
       final index = _items.indexWhere((i) => i.id == item.id);
       if (index >= 0) _items[index] = item;
+      _sortItems();
+      _errorMessage = null;
       notifyListeners();
       return true;
     } catch (e) {
@@ -103,6 +108,7 @@ class ChecklistViewModel extends ChangeNotifier {
     try {
       await _repository.delete(id);
       _items.removeWhere((i) => i.id == id);
+      _errorMessage = null;
       notifyListeners();
       return true;
     } catch (e) {
@@ -121,11 +127,25 @@ class ChecklistViewModel extends ChangeNotifier {
           isPacked: !_items[index].isPacked,
         );
       }
+      _sortItems();
+      _errorMessage = null;
       notifyListeners();
     } catch (e) {
       _errorMessage = e.toString().replaceFirst('Exception: ', '');
       notifyListeners();
     }
+  }
+
+  void _sortItems() {
+    _items.sort((a, b) {
+      final categoryCompare = a.category.name.compareTo(b.category.name);
+      if (categoryCompare != 0) return categoryCompare;
+
+      final priorityCompare = b.priority.compareTo(a.priority);
+      if (priorityCompare != 0) return priorityCompare;
+
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
   }
 
   void clearError() {

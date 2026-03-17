@@ -48,6 +48,7 @@ dependencies:
   share_plus: ^10.1.4
   # Nhắc nhở / thông báo
   flutter_local_notifications: ^18.0.1
+  flutter_timezone: ^5.0.2
   timezone: ^0.9.4
   # Mở bản đồ ngoài app
   url_launcher: ^6.3.1

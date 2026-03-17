@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:du_xuan/di.dart';
-import 'package:du_xuan/domain/entities/activity.dart';
+import 'package:du_xuan/routes/route_args.dart';
 import 'package:du_xuan/views/checklist/checklist_page.dart';
 import 'package:du_xuan/views/home/home_page.dart';
 import 'package:du_xuan/views/itinerary/activity_form_page.dart';
@@ -29,93 +29,125 @@ class AppRoutes {
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
       case splash:
-        return MaterialPageRoute(
-          builder: (_) => SplashPage(authRepo: buildAuthRepository()),
-        );
+        return _pageRoute(SplashPage(authRepo: buildAuthRepository()));
       case login:
-        return MaterialPageRoute(
-          builder: (_) => LoginPage(viewModel: buildLoginVM()),
-        );
+        return _pageRoute(LoginPage(viewModel: buildLoginVM()));
       case register:
-        return MaterialPageRoute(
-          builder: (_) => RegisterPage(viewModel: buildRegisterVM()),
-        );
+        return _pageRoute(RegisterPage(viewModel: buildRegisterVM()));
       case home:
-        return MaterialPageRoute(
-          builder: (_) => HomePage(viewModel: buildHomeVM()),
-        );
+        return _pageRoute(HomePage(viewModel: buildHomeVM()));
       case planCreate:
-        final userId = settings.arguments as int;
-        return MaterialPageRoute(
-          builder: (_) => PlanFormPage(
-            viewModel: buildPlanFormVM(),
-            userId: userId,
-          ),
+        return _typedArgsRoute<PlanCreateRouteArgs>(
+          settings,
+          expectedType: 'PlanCreateRouteArgs',
+          builder: (args) =>
+              PlanFormPage(viewModel: buildPlanFormVM(), userId: args.userId),
         );
       case planEdit:
-        final planId = settings.arguments as int;
-        return MaterialPageRoute(
-          builder: (_) => PlanFormPage(
+        return _typedArgsRoute<PlanEditRouteArgs>(
+          settings,
+          expectedType: 'PlanEditRouteArgs',
+          builder: (args) => PlanFormPage(
             viewModel: buildPlanFormVM(),
             userId: 0,
-            editPlanId: planId,
+            editPlanId: args.planId,
           ),
         );
       case itinerary:
-        final planId = settings.arguments as int;
-        return MaterialPageRoute(
-          builder: (_) => PlanDetailPage(
+        return _typedArgsRoute<ItineraryRouteArgs>(
+          settings,
+          expectedType: 'ItineraryRouteArgs',
+          builder: (args) => PlanDetailPage(
             viewModel: buildItineraryVM(),
-            planId: planId,
+            planId: args.planId,
           ),
         );
       case activityCreate:
-        final planDayId = settings.arguments as int;
-        return MaterialPageRoute(
-          builder: (_) => ActivityFormPage(
+        return _typedArgsRoute<ActivityCreateRouteArgs>(
+          settings,
+          expectedType: 'ActivityCreateRouteArgs',
+          builder: (args) => ActivityFormPage(
             viewModel: buildActivityFormVM(),
-            planDayId: planDayId,
+            planDayId: args.planDayId,
           ),
         );
       case activityEdit:
-        final activity = settings.arguments as Activity;
-        return MaterialPageRoute(
-          builder: (_) => ActivityFormPage(
+        return _typedArgsRoute<ActivityEditRouteArgs>(
+          settings,
+          expectedType: 'ActivityEditRouteArgs',
+          builder: (args) => ActivityFormPage(
             viewModel: buildActivityFormVM(),
-            planDayId: activity.planDayId,
-            existingActivity: activity,
+            planDayId: args.activity.planDayId,
+            existingActivity: args.activity,
           ),
         );
       case checklist:
-        final args = settings.arguments as Map<String, dynamic>;
-        return MaterialPageRoute(
-          builder: (_) => ChecklistPage(
+        return _typedArgsRoute<ChecklistRouteArgs>(
+          settings,
+          expectedType: 'ChecklistRouteArgs',
+          builder: (args) => ChecklistPage(
             viewModel: buildChecklistVM(),
-            planId: args['planId'] as int,
-            planName: args['planName'] as String,
+            planId: args.planId,
+            planName: args.planName,
           ),
         );
       case changePassword:
-        final userId = settings.arguments as int;
-        return MaterialPageRoute(
-          builder: (_) => ChangePasswordPage(
+        return _typedArgsRoute<ChangePasswordRouteArgs>(
+          settings,
+          expectedType: 'ChangePasswordRouteArgs',
+          builder: (args) => ChangePasswordPage(
             viewModel: buildChangePasswordVM(),
-            userId: userId,
+            userId: args.userId,
           ),
         );
       case notifications:
-        final userId = settings.arguments as int;
-        return MaterialPageRoute(
-          builder: (_) => NotificationPage(
+        return _typedArgsRoute<NotificationsRouteArgs>(
+          settings,
+          expectedType: 'NotificationsRouteArgs',
+          builder: (args) => NotificationPage(
             viewModel: buildNotificationVM(),
-            userId: userId,
+            userId: args.userId,
             notificationService: buildNotificationService(),
           ),
         );
       default:
-        return MaterialPageRoute(
-          builder: (_) => LoginPage(viewModel: buildLoginVM()),
-        );
+        return _pageRoute(LoginPage(viewModel: buildLoginVM()));
     }
+  }
+
+  static Route<dynamic> _pageRoute(Widget page, {RouteSettings? settings}) {
+    return MaterialPageRoute(settings: settings, builder: (_) => page);
+  }
+
+  static Route<dynamic> _typedArgsRoute<T>(
+    RouteSettings settings, {
+    required String expectedType,
+    required Widget Function(T args) builder,
+  }) {
+    final args = settings.arguments;
+    if (args is! T) {
+      return _invalidArgumentsRoute(settings, expectedType: expectedType);
+    }
+    return _pageRoute(builder(args), settings: settings);
+  }
+
+  static Route<dynamic> _invalidArgumentsRoute(
+    RouteSettings settings, {
+    required String expectedType,
+  }) {
+    return _pageRoute(
+      Scaffold(
+        appBar: AppBar(title: const Text('Route Error')),
+        body: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'Sai kiểu arguments cho route "${settings.name}". '
+            'Expected: $expectedType. '
+            'Actual: ${settings.arguments.runtimeType}.',
+          ),
+        ),
+      ),
+      settings: settings,
+    );
   }
 }

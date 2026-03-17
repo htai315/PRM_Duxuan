@@ -17,14 +17,13 @@ class ItineraryViewModel extends ChangeNotifier {
     required IPlanRepository planRepo,
     required IActivityRepository activityRepo,
     required NotificationService notificationService,
-  })  : _planRepo = planRepo,
-        _activityRepo = activityRepo,
-        _notificationService = notificationService;
+  }) : _planRepo = planRepo,
+       _activityRepo = activityRepo,
+       _notificationService = notificationService;
 
   // ─── State ────────────────────────────────────────────
   Plan? _plan;
   int _selectedDayIndex = 0;
-  List<Activity> _activities = [];
   Map<int, List<Activity>> _allActivitiesByDay = {};
   bool _isLoading = false;
   String? _errorMessage;
@@ -33,11 +32,15 @@ class ItineraryViewModel extends ChangeNotifier {
   Plan? get plan => _plan;
   List<PlanDay> get days => _plan?.days ?? [];
   int get selectedDayIndex => _selectedDayIndex;
-  PlanDay? get selectedDay =>
-      days.isNotEmpty && _selectedDayIndex < days.length
-          ? days[_selectedDayIndex]
-          : null;
-  List<Activity> get activities => _activities;
+  PlanDay? get selectedDay => days.isNotEmpty && _selectedDayIndex < days.length
+      ? days[_selectedDayIndex]
+      : null;
+  List<Activity> get activities {
+    final day = selectedDay;
+    if (day == null) return const [];
+    return List.unmodifiable(_allActivitiesByDay[day.id] ?? const <Activity>[]);
+  }
+
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
@@ -47,7 +50,7 @@ class ItineraryViewModel extends ChangeNotifier {
 
   /// Tổng chi phí ước tính của ngày hiện tại
   double get totalCostOfDay {
-    return _activities.fold(0.0, (sum, a) => sum + (a.estimatedCost ?? 0));
+    return activities.fold(0.0, (sum, a) => sum + (a.estimatedCost ?? 0));
   }
 
   /// Chế độ xem: chỉ khi status đã completed/archived
@@ -64,7 +67,9 @@ class ItineraryViewModel extends ChangeNotifier {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final end = DateTime(
-      _plan!.endDate.year, _plan!.endDate.month, _plan!.endDate.day,
+      _plan!.endDate.year,
+      _plan!.endDate.month,
+      _plan!.endDate.day,
     );
     return today.isAfter(end);
   }
@@ -87,17 +92,19 @@ class ItineraryViewModel extends ChangeNotifier {
     return !today.isBefore(start) && !today.isAfter(end);
   }
 
-  /// Mọi ngày đều có activity và tất cả activity đều đã done.
+  /// Tất cả activity hiện có đều đã done và có ít nhất một activity.
   bool get isAllDaysCompleted {
     if (_plan == null || days.isEmpty) return false;
+    var hasAnyActivity = false;
 
     for (final day in days) {
       final activities = _allActivitiesByDay[day.id] ?? const <Activity>[];
-      if (activities.isEmpty) return false;
+      if (activities.isEmpty) continue;
+      hasAnyActivity = true;
       final hasUndone = activities.any((a) => a.status != ActivityStatus.done);
       if (hasUndone) return false;
     }
-    return true;
+    return hasAnyActivity;
   }
 
   /// Có thể đánh dấu completed khi plan đang diễn ra và toàn bộ hoạt động đã xong.
@@ -114,20 +121,20 @@ class ItineraryViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _plan = await _planRepo.getById(planId);
+      final loadedPlan = await _planRepo.getById(planId);
+      final allActivitiesByDay = <int, List<Activity>>{};
+
+      _plan = loadedPlan;
       _selectedDayIndex = 0;
+      _errorMessage = null;
 
       // Load activities cho TẤT CẢ ngày song song (tránh block main thread)
-      _allActivitiesByDay = {};
       final futures = days.map((day) async {
         final acts = await _activityRepo.getByPlanDayId(day.id);
-        _allActivitiesByDay[day.id] = acts;
+        allActivitiesByDay[day.id] = acts;
       });
       await Future.wait(futures);
-
-      if (selectedDay != null) {
-        _activities = _allActivitiesByDay[selectedDay!.id] ?? [];
-      }
+      _allActivitiesByDay = allActivitiesByDay;
     } catch (e) {
       _errorMessage = e.toString().replaceFirst('Exception: ', '');
     }
@@ -140,33 +147,41 @@ class ItineraryViewModel extends ChangeNotifier {
     if (index == _selectedDayIndex) return;
     _selectedDayIndex = index;
     notifyListeners();
-    await _loadActivities();
+    await _refreshSelectedDayActivities(notifyAfterFetch: true);
   }
 
-  Future<void> _loadActivities() async {
+  Future<void> _refreshSelectedDayActivities({
+    bool notifyAfterFetch = true,
+  }) async {
     final day = selectedDay;
     if (day == null) {
-      _activities = [];
-      notifyListeners();
+      if (notifyAfterFetch) {
+        notifyListeners();
+      }
       return;
     }
 
     try {
-      _activities = await _activityRepo.getByPlanDayId(day.id);
+      final refreshed = await _activityRepo.getByPlanDayId(day.id);
+      _setActivitiesForDay(day.id, refreshed);
+      _errorMessage = null;
     } catch (e) {
       _errorMessage = e.toString().replaceFirst('Exception: ', '');
     }
-    notifyListeners();
+    if (notifyAfterFetch) {
+      notifyListeners();
+    }
   }
 
   Future<void> refreshActivities() async {
-    await _loadActivities();
+    await _refreshSelectedDayActivities();
   }
 
   Future<bool> deleteActivity(int id) async {
     try {
       await _activityRepo.delete(id);
-      _activities.removeWhere((a) => a.id == id);
+      _removeActivityFromCache(id);
+      _errorMessage = null;
       notifyListeners();
       return true;
     } catch (e) {
@@ -178,20 +193,23 @@ class ItineraryViewModel extends ChangeNotifier {
 
   /// Xóa khỏi UI (chưa xóa DB) — dùng cho undo snackbar
   int removeLocally(int activityId) {
-    final index = _activities.indexWhere((a) => a.id == activityId);
-    if (index >= 0) {
-      _activities.removeAt(index);
+    final location = _findActivityLocation(activityId);
+    if (location != null) {
+      final dayActivities = _activitiesBucket(location.dayId);
+      dayActivities.removeAt(location.index);
       notifyListeners();
+      return location.index;
     }
-    return index;
+    return -1;
   }
 
   /// Khôi phục activity vào UI — dùng cho undo
   void restoreLocally(Activity activity, int index) {
-    if (index >= 0 && index <= _activities.length) {
-      _activities.insert(index, activity);
+    final dayActivities = _activitiesBucket(activity.planDayId);
+    if (index >= 0 && index <= dayActivities.length) {
+      dayActivities.insert(index, activity);
     } else {
-      _activities.add(activity);
+      dayActivities.add(activity);
     }
     notifyListeners();
   }
@@ -199,7 +217,7 @@ class ItineraryViewModel extends ChangeNotifier {
   Future<void> toggleActivityStatus(int id) async {
     try {
       await _activityRepo.toggleStatus(id);
-      await _loadActivities();
+      await _refreshSelectedDayActivities();
     } catch (e) {
       _errorMessage = e.toString().replaceFirst('Exception: ', '');
       notifyListeners();
@@ -211,7 +229,7 @@ class ItineraryViewModel extends ChangeNotifier {
     if (_plan == null) return false;
     if (!canMarkPlanCompleted) {
       _errorMessage =
-          'Chỉ có thể hoàn thành khi kế hoạch đang diễn ra và mọi hoạt động đều đã xong.';
+          'Chỉ có thể hoàn thành khi kế hoạch đang diễn ra và tất cả hoạt động hiện có đã xong.';
       notifyListeners();
       return false;
     }
@@ -257,5 +275,39 @@ class ItineraryViewModel extends ChangeNotifier {
     } catch (e) {
       debugPrint('Notification sync error (plan ${plan.id}): $e');
     }
+  }
+
+  void _setActivitiesForDay(int planDayId, List<Activity> activities) {
+    _allActivitiesByDay[planDayId] = List<Activity>.from(activities);
+  }
+
+  List<Activity> _activitiesBucket(int planDayId) {
+    return _allActivitiesByDay.putIfAbsent(planDayId, () => <Activity>[]);
+  }
+
+  ({int dayId, int index})? _findActivityLocation(int activityId) {
+    final currentDayId = selectedDay?.id;
+    if (currentDayId != null) {
+      final currentIndex = _activitiesBucket(
+        currentDayId,
+      ).indexWhere((a) => a.id == activityId);
+      if (currentIndex >= 0) {
+        return (dayId: currentDayId, index: currentIndex);
+      }
+    }
+
+    for (final entry in _allActivitiesByDay.entries) {
+      final index = entry.value.indexWhere((a) => a.id == activityId);
+      if (index >= 0) {
+        return (dayId: entry.key, index: index);
+      }
+    }
+    return null;
+  }
+
+  void _removeActivityFromCache(int activityId) {
+    final location = _findActivityLocation(activityId);
+    if (location == null) return;
+    _activitiesBucket(location.dayId).removeAt(location.index);
   }
 }

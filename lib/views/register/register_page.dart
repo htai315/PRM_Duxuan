@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:du_xuan/viewmodels/register/register_viewmodel.dart';
 import 'package:du_xuan/core/constants/app_colors.dart';
+import 'package:du_xuan/routes/app_routes.dart';
 import 'package:du_xuan/views/auth/widgets/auth_ui.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -28,10 +29,7 @@ class _RegisterPageState extends State<RegisterPage>
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
-    _formFade = CurvedAnimation(
-      parent: _formAnim,
-      curve: Curves.easeOutCubic,
-    );
+    _formFade = CurvedAnimation(parent: _formAnim, curve: Curves.easeOutCubic);
     _formSlide = Tween<Offset>(
       begin: const Offset(0, 0.06),
       end: Offset.zero,
@@ -165,7 +163,7 @@ class _RegisterPageState extends State<RegisterPage>
       _confirmCtrl.text,
     );
     if (session != null && mounted) {
-      Navigator.pushReplacementNamed(context, '/home');
+      Navigator.pushReplacementNamed(context, AppRoutes.home);
     }
   }
 }
