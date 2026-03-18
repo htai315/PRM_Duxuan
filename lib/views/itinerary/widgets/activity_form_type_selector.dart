@@ -17,66 +17,98 @@ class ActivityFormTypeSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children: ActivityType.values.map((type) {
-        final isSelected = type == selectedType;
-        final typeColor = resolveColor(type);
+    final selectedColor = resolveColor(selectedType);
 
-        return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => onSelected(type),
-            borderRadius: BorderRadius.circular(16),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? typeColor.withValues(alpha: 0.1)
-                    : AppColors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isSelected
-                      ? typeColor.withValues(alpha: 0.5)
-                      : AppColors.divider.withValues(alpha: 0.5),
-                  width: 1,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.bgCream.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.divider.withValues(alpha: 0.85)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: selectedColor.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(selectedType.icon, color: selectedColor, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<ActivityType>(
+                value: selectedType,
+                isExpanded: true,
+                borderRadius: BorderRadius.circular(18),
+                dropdownColor: AppColors.white,
+                icon: Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: selectedColor,
+                  size: 22,
                 ),
-                boxShadow: isSelected
-                    ? []
-                    : [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.02),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
+                style: AppTextStyles.bodyLarge.copyWith(
+                  color: AppColors.textDark,
+                  fontWeight: FontWeight.w700,
+                ),
+                selectedItemBuilder: (context) {
+                  return ActivityType.values.map((type) {
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        type.label,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.bodyLarge.copyWith(
+                          color: AppColors.textDark,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    );
+                  }).toList();
+                },
+                items: ActivityType.values.map((type) {
+                  final typeColor = resolveColor(type);
+                  return DropdownMenuItem<ActivityType>(
+                    value: type,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: typeColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(type.icon, size: 16, color: typeColor),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            type.label,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: AppColors.textDark,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                       ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    type.icon,
-                    size: 18,
-                    color: isSelected ? typeColor : AppColors.textMedium,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    type.label,
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: isSelected ? typeColor : AppColors.textMedium,
-                      fontWeight: isSelected
-                          ? FontWeight.w700
-                          : FontWeight.w500,
                     ),
-                  ),
-                ],
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    onSelected(value);
+                  }
+                },
               ),
             ),
           ),
-        );
-      }).toList(),
+        ],
+      ),
     );
   }
 }

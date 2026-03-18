@@ -1,30 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:du_xuan/core/constants/app_colors.dart';
+import 'package:du_xuan/core/utils/activity_cost_ui.dart';
 import 'package:du_xuan/core/utils/app_feedback.dart';
 import 'package:du_xuan/core/utils/date_ui.dart';
 import 'package:du_xuan/domain/entities/activity.dart';
 import 'package:du_xuan/routes/app_routes.dart';
 import 'package:du_xuan/routes/route_args.dart';
+import 'package:du_xuan/viewmodels/expense/expense_viewmodel.dart';
 import 'package:du_xuan/viewmodels/itinerary/itinerary_viewmodel.dart';
+import 'package:du_xuan/views/expense/widgets/expense_editor_bottom_sheet.dart';
 import 'package:du_xuan/views/itinerary/activity_detail_page.dart';
 import 'package:du_xuan/views/itinerary/location_action_sheet.dart';
 import 'package:du_xuan/views/plan_detail/widgets/day_detail_activity_node.dart';
+import 'package:du_xuan/views/plan_detail/widgets/day_detail_action_sheet.dart';
 import 'package:du_xuan/views/plan_detail/widgets/day_detail_bottom_bar.dart';
 import 'package:du_xuan/views/plan_detail/widgets/day_detail_empty_state.dart';
 import 'package:du_xuan/views/plan_detail/widgets/day_detail_fab.dart';
 import 'package:du_xuan/views/plan_detail/widgets/day_detail_header.dart';
-import 'package:intl/intl.dart';
 
 /// Trang chi tiết 1 ngày — Premium UI với Fixed Bottom Bar (Blur) và Neumorphism Cards.
 class DayDetailPage extends StatefulWidget {
   final ItineraryViewModel viewModel;
+  final ExpenseViewModel expenseViewModel;
   final int dayIndex;
   final int planId;
 
   const DayDetailPage({
     super.key,
     required this.viewModel,
+    required this.expenseViewModel,
     required this.dayIndex,
     required this.planId,
   });
@@ -57,7 +62,10 @@ class _DayDetailPageState extends State<DayDetailPage> {
         child: SafeArea(
           bottom: false,
           child: ListenableBuilder(
-            listenable: widget.viewModel,
+            listenable: Listenable.merge([
+              widget.viewModel,
+              widget.expenseViewModel,
+            ]),
             builder: (context, _) {
               final day = widget.viewModel.selectedDay;
               if (day == null) {
@@ -65,7 +73,15 @@ class _DayDetailPageState extends State<DayDetailPage> {
               }
 
               final isViewMode = widget.viewModel.isViewMode;
+              final canAddActivity = !isViewMode;
+              final canAddExpense = widget.viewModel.canManageExpenses;
               final activities = widget.viewModel.activities;
+              final expenses = widget.expenseViewModel.expensesForDay(day.id);
+              final costSummary = ActivityCostUi.buildDaySummary(
+                activities: activities,
+                expenses: expenses,
+              );
+              final hasBottomBar = costSummary.hasAnyCost;
 
               return Column(
                 children: [
@@ -78,14 +94,25 @@ class _DayDetailPageState extends State<DayDetailPage> {
                   Expanded(
                     child: Stack(
                       children: [
-                        _buildActivityList(activities, isViewMode),
-                        if (!isViewMode)
+                        _buildActivityList(
+                          activities,
+                          isViewMode: isViewMode,
+                          canAddActivity: canAddActivity,
+                          canAddExpense: canAddExpense,
+                        ),
+                        if (canAddActivity || canAddExpense)
                           Positioned(
-                            bottom: activities.isNotEmpty
+                            bottom: hasBottomBar
                                 ? MediaQuery.of(context).padding.bottom + 92
                                 : 24,
                             right: 16,
-                            child: DayDetailFab(onTap: _navigateToAddActivity),
+                            child: DayDetailFab(
+                              onTap: () => _handlePrimaryActionTap(
+                                canAddActivity: canAddActivity,
+                                canAddExpense: canAddExpense,
+                              ),
+                              isExpenseOnly: !canAddActivity && canAddExpense,
+                            ),
                           ),
                       ],
                     ),
@@ -97,12 +124,24 @@ class _DayDetailPageState extends State<DayDetailPage> {
         ),
       ),
       bottomNavigationBar: ListenableBuilder(
-        listenable: widget.viewModel,
+        listenable: Listenable.merge([
+          widget.viewModel,
+          widget.expenseViewModel,
+        ]),
         builder: (context, _) {
+          final day = widget.viewModel.selectedDay;
+          if (day == null) return const SizedBox.shrink();
           final activities = widget.viewModel.activities;
-          if (activities.isEmpty) return const SizedBox.shrink();
+          final expenses = widget.expenseViewModel.expensesForDay(day.id);
+          final costSummary = ActivityCostUi.buildDaySummary(
+            activities: activities,
+            expenses: expenses,
+          );
+          if (!costSummary.hasAnyCost) return const SizedBox.shrink();
           return DayDetailBottomBar(
-            totalCostLabel: _formatCost(widget.viewModel.totalCostOfDay),
+            title: costSummary.bottomBarTitle,
+            totalCostLabel: costSummary.bottomBarTotalLabel,
+            supportingText: costSummary.bottomBarSupportingText,
           );
         },
       ),
@@ -111,9 +150,17 @@ class _DayDetailPageState extends State<DayDetailPage> {
 
   // ─── ListView ─────────────────────────────────────────
 
-  Widget _buildActivityList(List<Activity> activities, bool isViewMode) {
+  Widget _buildActivityList(
+    List<Activity> activities, {
+    required bool isViewMode,
+    required bool canAddActivity,
+    required bool canAddExpense,
+  }) {
     if (activities.isEmpty) {
-      return DayDetailEmptyState(isViewMode: isViewMode);
+      return DayDetailEmptyState(
+        canAddActivity: canAddActivity,
+        canAddExpense: canAddExpense,
+      );
     }
 
     return ListView.separated(
@@ -165,9 +212,7 @@ class _DayDetailPageState extends State<DayDetailPage> {
       isLast: isLast,
       typeColor: typeColor,
       hasLocation: hasLocation,
-      costLabel: activity.estimatedCost != null
-          ? _formatCost(activity.estimatedCost!)
-          : '0₫',
+      costLabel: ActivityCostUi.activityCostBadgeLabel(activity),
       onOpenDetail: () => _navigateToDetail(activity),
       onToggleStatus: () => widget.viewModel.toggleActivityStatus(activity.id),
       onDelete: () => _undoableDelete(activity),
@@ -180,12 +225,6 @@ class _DayDetailPageState extends State<DayDetailPage> {
         );
       },
     );
-  }
-
-  String _formatCost(double cost) {
-    if (cost <= 0) return '0₫';
-    final formatted = NumberFormat('#,###', 'vi').format(cost.toInt());
-    return '$formatted₫';
   }
 
   Future<void> _navigateToAddActivity() async {
@@ -207,8 +246,80 @@ class _DayDetailPageState extends State<DayDetailPage> {
     }
   }
 
+  Future<void> _handlePrimaryActionTap({
+    required bool canAddActivity,
+    required bool canAddExpense,
+  }) async {
+    if (canAddActivity && !canAddExpense) {
+      await _navigateToAddActivity();
+      return;
+    }
+
+    if (!canAddActivity && canAddExpense) {
+      await _openQuickAddExpense();
+      return;
+    }
+
+    await DayDetailActionSheet.show(
+      context,
+      onAddActivity: canAddActivity ? _navigateToAddActivity : null,
+      onAddExpense: canAddExpense ? _openQuickAddExpense : null,
+    );
+  }
+
+  Future<void> _openQuickAddExpense() async {
+    final day = widget.viewModel.selectedDay;
+    final plan = widget.viewModel.plan;
+    if (day == null || plan == null) return;
+
+    final result = await ExpenseEditorBottomSheet.show(
+      context,
+      title: 'Thêm khoản chi',
+      days: widget.viewModel.days,
+      activitiesForDay: widget.viewModel.activitiesForDay,
+      initialPlanDayId: day.id,
+    );
+
+    if (result == null) return;
+
+    final created = await widget.expenseViewModel.addExpense(
+      planId: plan.id,
+      planDayId: result.planDayId,
+      activityId: result.activityId,
+      title: result.title,
+      amountText: result.amountText,
+      category: result.category,
+      note: result.note,
+      spentAt: _resolveExpenseDate(result.planDayId, fallback: day.date),
+    );
+
+    if (!mounted) return;
+
+    if (created != null) {
+      AppFeedback.showSuccessSnack(
+        context,
+        'Đã thêm khoản chi cho ngày này',
+        duration: const Duration(seconds: 3),
+      );
+    } else {
+      AppFeedback.showErrorSnack(
+        context,
+        widget.expenseViewModel.errorMessage ?? 'Không thể thêm khoản chi',
+      );
+    }
+  }
+
+  DateTime _resolveExpenseDate(int? planDayId, {required DateTime fallback}) {
+    if (planDayId != null) {
+      for (final day in widget.viewModel.days) {
+        if (day.id == planDayId) return day.date;
+      }
+    }
+    return fallback;
+  }
+
   Future<void> _navigateToDetail(Activity activity) async {
-    final result = await Navigator.push<String>(
+    final result = await Navigator.push<Object?>(
       context,
       MaterialPageRoute(
         builder: (_) => ActivityDetailPage(

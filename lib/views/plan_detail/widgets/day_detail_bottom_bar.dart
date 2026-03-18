@@ -5,9 +5,16 @@ import 'package:du_xuan/core/constants/app_text_styles.dart';
 import 'package:flutter/material.dart';
 
 class DayDetailBottomBar extends StatelessWidget {
+  final String title;
   final String totalCostLabel;
+  final String? supportingText;
 
-  const DayDetailBottomBar({super.key, required this.totalCostLabel});
+  const DayDetailBottomBar({
+    super.key,
+    required this.title,
+    required this.totalCostLabel,
+    this.supportingText,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +57,7 @@ class DayDetailBottomBar extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Tong chi phi ngay',
+                    title,
                     style: AppTextStyles.bodyMedium.copyWith(
                       color: AppColors.textMedium,
                       fontWeight: FontWeight.w500,
@@ -66,6 +73,17 @@ class DayDetailBottomBar extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                  if (supportingText != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      supportingText!,
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textLight,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ],

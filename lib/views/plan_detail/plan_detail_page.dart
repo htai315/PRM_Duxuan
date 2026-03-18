@@ -11,8 +11,10 @@ import 'package:du_xuan/routes/app_routes.dart';
 import 'package:du_xuan/routes/route_args.dart';
 import 'package:du_xuan/viewmodels/itinerary/itinerary_viewmodel.dart';
 import 'package:du_xuan/viewmodels/checklist/checklist_viewmodel.dart';
+import 'package:du_xuan/viewmodels/expense/expense_viewmodel.dart';
 import 'package:du_xuan/views/plan_detail/tabs/day_list_tab.dart';
 import 'package:du_xuan/views/plan_detail/tabs/checklist_tab.dart';
+import 'package:du_xuan/views/plan_detail/tabs/expense_tab.dart';
 import 'package:du_xuan/views/plan_detail/tabs/locations_tab.dart';
 import 'package:du_xuan/views/shared/widgets/app_badge_chip.dart';
 import 'package:du_xuan/views/shared/widgets/app_circle_icon.dart';
@@ -39,14 +41,17 @@ class _PlanDetailPageState extends State<PlanDetailPage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   late final ChecklistViewModel _checklistVM;
+  late final ExpenseViewModel _expenseVM;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _checklistVM = buildChecklistVM();
+    _expenseVM = buildExpenseVM();
     widget.viewModel.loadPlan(widget.planId);
     _checklistVM.loadItems(widget.planId);
+    _expenseVM.loadExpenses(widget.planId);
   }
 
   @override
@@ -61,6 +66,7 @@ class _PlanDetailPageState extends State<PlanDetailPage>
     // Hot reload: load lại dữ liệu để tránh state cũ.
     widget.viewModel.loadPlan(widget.planId);
     _checklistVM.loadItems(widget.planId);
+    _expenseVM.loadExpenses(widget.planId);
   }
 
   @override
@@ -104,13 +110,20 @@ class _PlanDetailPageState extends State<PlanDetailPage>
                       children: [
                         DayListTab(
                           viewModel: widget.viewModel,
+                          expenseViewModel: _expenseVM,
                           planId: widget.planId,
+                          onDayDetailClosed: () =>
+                              _expenseVM.loadExpenses(widget.planId),
                         ),
                         ChecklistTab(
                           checklistVM: _checklistVM,
                           planId: widget.planId,
                           planName: plan.name,
                           readOnly: widget.viewModel.isViewMode,
+                        ),
+                        ExpenseTab(
+                          expenseVM: _expenseVM,
+                          itineraryVM: widget.viewModel,
                         ),
                         LocationsTab(viewModel: widget.viewModel),
                       ],
@@ -270,6 +283,11 @@ class _PlanDetailPageState extends State<PlanDetailPage>
             height: 42,
           ),
           Tab(
+            icon: Icon(Icons.receipt_long_rounded, size: 16),
+            text: 'Chi tiêu',
+            height: 42,
+          ),
+          Tab(
             icon: Icon(Icons.place_rounded, size: 16),
             text: 'Điểm đến',
             height: 42,
@@ -309,6 +327,7 @@ class _PlanDetailPageState extends State<PlanDetailPage>
         if (!mounted) return;
         if (result == true) {
           widget.viewModel.loadPlan(widget.planId);
+          _expenseVM.loadExpenses(widget.planId);
           AppFeedback.showSuccessSnack(
             context,
             'Cập nhật kế hoạch thành công',

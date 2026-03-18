@@ -49,7 +49,7 @@ class ItineraryViewModel extends ChangeNotifier {
       _allActivitiesByDay[planDayId] ?? [];
 
   /// Tổng chi phí ước tính của ngày hiện tại
-  double get totalCostOfDay {
+  double get totalEstimatedCostOfDay {
     return activities.fold(0.0, (sum, a) => sum + (a.estimatedCost ?? 0));
   }
 
@@ -58,6 +58,11 @@ class ItineraryViewModel extends ChangeNotifier {
     if (_plan == null) return false;
     final status = _plan!.status;
     return status == PlanStatus.completed || status == PlanStatus.archived;
+  }
+
+  bool get canManageExpenses {
+    if (_plan == null) return false;
+    return _plan!.status != PlanStatus.archived;
   }
 
   /// Đã qua ngày kết thúc nhưng chưa đánh dấu hoàn thành

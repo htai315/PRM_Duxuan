@@ -1,6 +1,7 @@
 import 'package:du_xuan/core/constants/app_colors.dart';
 import 'package:du_xuan/core/constants/app_text_styles.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class ActivityFormInput extends StatelessWidget {
   final TextEditingController controller;
@@ -11,6 +12,7 @@ class ActivityFormInput extends StatelessWidget {
   final bool isBorderless;
   final ValueChanged<String>? onChanged;
   final Color iconColor;
+  final List<TextInputFormatter>? inputFormatters;
 
   const ActivityFormInput({
     super.key,
@@ -22,6 +24,7 @@ class ActivityFormInput extends StatelessWidget {
     this.keyboardType,
     this.isBorderless = false,
     this.onChanged,
+    this.inputFormatters,
   });
 
   @override
@@ -30,6 +33,7 @@ class ActivityFormInput extends StatelessWidget {
       controller: controller,
       maxLines: maxLines,
       keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
       onChanged: onChanged,
       style: AppTextStyles.bodyLarge.copyWith(fontWeight: FontWeight.w500),
       decoration: InputDecoration(

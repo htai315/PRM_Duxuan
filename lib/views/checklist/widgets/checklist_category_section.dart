@@ -29,56 +29,76 @@ class ChecklistCategorySection extends StatelessWidget {
     final packedInCat = items.where((item) => item.isPacked).length;
     final allPacked = packedInCat == items.length;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          margin: const EdgeInsets.only(top: 14, bottom: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                catColor.withValues(alpha: 0.08),
-                catColor.withValues(alpha: 0.02),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(12),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.white.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.divider.withValues(alpha: 0.8)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
-          child: Row(
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
               Container(
-                width: 30,
-                height: 30,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
-                  color: catColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(9),
+                  color: catColor.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(11),
                 ),
                 child: Icon(category.icon, size: 16, color: catColor),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 9),
               Expanded(
-                child: Text(
-                  category.label,
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: catColor,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      category.label,
+                      style: AppTextStyles.bodyLarge.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: catColor,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      allPacked
+                          ? 'Tất cả vật dụng trong nhóm này đã sẵn sàng'
+                          : '$packedInCat/${items.length} vật dụng đã chuẩn bị',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textLight,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
                   color: allPacked
                       ? AppColors.success.withValues(alpha: 0.12)
-                      : catColor.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(10),
+                      : catColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
                   allPacked
-                      ? '✓ $packedInCat/$packedInCat'
+                      ? '✓ $packedInCat/${items.length}'
                       : '$packedInCat/${items.length}',
                   style: AppTextStyles.bodySmall.copyWith(
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                     fontSize: 11,
                     color: allPacked ? AppColors.success : catColor,
                   ),
@@ -86,18 +106,19 @@ class ChecklistCategorySection extends StatelessWidget {
               ),
             ],
           ),
-        ),
-        ...items.map(
-          (item) => ChecklistItemCard(
-            item: item,
-            categoryColor: catColor,
-            readOnly: readOnly,
-            onEdit: () => onEdit(item),
-            onTogglePacked: () => onTogglePacked(item.id),
-            onConfirmDelete: () => onConfirmDelete(item),
+          const SizedBox(height: 10),
+          ...items.map(
+            (item) => ChecklistItemCard(
+              item: item,
+              categoryColor: catColor,
+              readOnly: readOnly,
+              onEdit: () => onEdit(item),
+              onTogglePacked: () => onTogglePacked(item.id),
+              onConfirmDelete: () => onConfirmDelete(item),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'package:du_xuan/core/utils/app_currency_input_formatter.dart';
+
 class ParsedCostInput {
   final double? value;
   final String? errorMessage;
@@ -54,7 +56,9 @@ class AppFormValidators {
       return const ParsedCostInput(value: null, errorMessage: null);
     }
 
-    final compact = normalized.replaceAll(RegExp(r'\s+'), '');
+    final compact = AppCurrencyInputFormatter.stripFormatting(
+      normalized,
+    ).replaceAll(RegExp(r'\s+'), '');
     final decimalPattern = RegExp(r'^\d+[.,]\d+$');
     final groupedPattern = RegExp(r'^\d{1,3}([.,]\d{3})+$');
     final plainDigitsPattern = RegExp(r'^\d+$');

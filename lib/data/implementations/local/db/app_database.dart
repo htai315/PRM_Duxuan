@@ -6,7 +6,7 @@ class AppDatabase {
   AppDatabase._();
 
   static final AppDatabase instance = AppDatabase._();
-  static const int _dbVersion = 2;
+  static const int _dbVersion = 1;
 
   Database? _db;
 
@@ -37,11 +37,6 @@ class AppDatabase {
         await _createSchema(db);
         await _seedDefaultUsers(db);
       },
-      onUpgrade: (db, oldVersion, newVersion) async {
-        if (oldVersion < 2) {
-          await _migrateToV2(db);
-        }
-      },
     );
   }
 
@@ -52,17 +47,8 @@ class AppDatabase {
     await _createPlanDaysTable(db);
     await _createDestinationsTable(db);
     await _createActivitiesTable(db);
+    await _createExpensesTable(db);
     await _createChecklistItemsTable(db);
-    await _createNotificationsTable(db);
-    await _createIndexes(db);
-  }
-
-  Future<void> _migrateToV2(Database db) async {
-    // V2 chuẩn hóa ownership schema ở AppDatabase và bổ sung indexes
-    // cho các bảng query nhiều. destinations vẫn được giữ vì schema này
-    // còn được tham chiếu FK từ activities dù flow hiện tại chủ yếu dùng
-    // location_text để render UI.
-    await _createDestinationsTable(db);
     await _createNotificationsTable(db);
     await _createIndexes(db);
   }
@@ -163,6 +149,28 @@ class AppDatabase {
     ''');
   }
 
+  Future<void> _createExpensesTable(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS expenses(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        plan_id INTEGER NOT NULL,
+        plan_day_id INTEGER,
+        activity_id INTEGER,
+        title TEXT NOT NULL,
+        amount REAL NOT NULL CHECK(amount >= 0),
+        category TEXT NOT NULL DEFAULT 'OTHER',
+        note TEXT,
+        spent_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        source TEXT NOT NULL DEFAULT 'MANUAL',
+        FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE,
+        FOREIGN KEY (plan_day_id) REFERENCES plan_days(id) ON DELETE SET NULL,
+        FOREIGN KEY (activity_id) REFERENCES activities(id) ON DELETE SET NULL
+      )
+    ''');
+  }
+
   Future<void> _createChecklistItemsTable(DatabaseExecutor db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS checklist_items(
@@ -213,6 +221,18 @@ class AppDatabase {
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_activities_plan_day_id ON activities(plan_day_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_expenses_plan_id ON expenses(plan_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_expenses_plan_day_id ON expenses(plan_day_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_expenses_activity_id ON expenses(activity_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_expenses_spent_at ON expenses(spent_at)',
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_checklist_items_plan_id ON checklist_items(plan_id)',

@@ -3,18 +3,33 @@ import 'package:flutter/material.dart';
 import 'package:du_xuan/views/shared/widgets/app_empty_state.dart';
 
 class DayDetailEmptyState extends StatelessWidget {
-  final bool isViewMode;
+  final bool canAddActivity;
+  final bool canAddExpense;
 
-  const DayDetailEmptyState({super.key, required this.isViewMode});
+  const DayDetailEmptyState({
+    super.key,
+    required this.canAddActivity,
+    required this.canAddExpense,
+  });
 
   @override
   Widget build(BuildContext context) {
+    String subtitle;
+    if (canAddActivity && canAddExpense) {
+      subtitle =
+          'Ngày này chưa có lịch trình nào. Bấm + để thêm hoạt động đầu tiên hoặc ghi khoản chi.';
+    } else if (canAddExpense) {
+      subtitle =
+          'Ngày này chưa có lịch trình nào. Bạn vẫn có thể bấm + để ghi khoản chi cho ngày này.';
+    } else {
+      subtitle =
+          'Ngày này chưa có lịch trình nào. Kế hoạch lưu trữ chỉ còn ở chế độ xem.';
+    }
+
     return AppEmptyState(
       icon: Icons.luggage_rounded,
       title: 'Một ngày trống rỗng...',
-      subtitle: isViewMode
-          ? 'Ngày này chưa có lịch trình nào. Hãy tận hưởng khoảng nghỉ ngơi của bạn.'
-          : '"Một cuộc hành trình ngàn dặm bắt đầu từ một bước chân nhỏ". Bấm + để thêm hoạt động đầu tiên.',
+      subtitle: subtitle,
       accentColor: AppColors.primary,
       iconBoxSize: 100,
       iconSize: 50,

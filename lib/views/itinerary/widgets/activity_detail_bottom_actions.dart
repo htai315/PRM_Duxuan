@@ -5,14 +5,10 @@ import 'package:du_xuan/core/constants/app_text_styles.dart';
 import 'package:flutter/material.dart';
 
 class ActivityDetailBottomActions extends StatelessWidget {
-  final VoidCallback onDelete;
-  final VoidCallback onEdit;
+  final VoidCallback? onDelete;
+  final VoidCallback? onEdit;
 
-  const ActivityDetailBottomActions({
-    super.key,
-    required this.onDelete,
-    required this.onEdit,
-  });
+  const ActivityDetailBottomActions({super.key, this.onDelete, this.onEdit});
 
   @override
   Widget build(BuildContext context) {

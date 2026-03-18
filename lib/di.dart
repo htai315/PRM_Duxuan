@@ -1,6 +1,7 @@
 import 'package:du_xuan/data/implementations/api/activity_api.dart';
 import 'package:du_xuan/data/implementations/api/auth_api.dart';
 import 'package:du_xuan/data/implementations/api/checklist_api.dart';
+import 'package:du_xuan/data/implementations/api/expense_api.dart';
 import 'package:du_xuan/data/implementations/api/geocoding_service.dart';
 import 'package:du_xuan/data/implementations/api/notification_api.dart';
 import 'package:du_xuan/data/implementations/api/openai_service.dart';
@@ -9,16 +10,20 @@ import 'package:du_xuan/data/implementations/local/db/app_database.dart';
 import 'package:du_xuan/data/implementations/mapper/activity_mapper.dart';
 import 'package:du_xuan/data/implementations/mapper/auth_mapper.dart';
 import 'package:du_xuan/data/implementations/mapper/checklist_mapper.dart';
+import 'package:du_xuan/data/implementations/mapper/expense_mapper.dart';
 import 'package:du_xuan/data/implementations/mapper/notification_mapper.dart';
 import 'package:du_xuan/data/implementations/mapper/plan_mapper.dart';
 import 'package:du_xuan/data/implementations/repositories/activity_repository.dart';
 import 'package:du_xuan/data/implementations/repositories/auth_repository.dart';
 import 'package:du_xuan/data/implementations/repositories/checklist_repository.dart';
+import 'package:du_xuan/data/implementations/repositories/expense_repository.dart';
 import 'package:du_xuan/data/implementations/repositories/notification_repository.dart';
 import 'package:du_xuan/data/implementations/repositories/plan_repository.dart';
 import 'package:du_xuan/core/utils/notification_service.dart';
+import 'package:du_xuan/data/interfaces/repositories/i_expense_repository.dart';
 import 'package:du_xuan/viewmodels/checklist/checklist_viewmodel.dart';
 import 'package:du_xuan/viewmodels/checklist/suggestion_viewmodel.dart';
+import 'package:du_xuan/viewmodels/expense/expense_viewmodel.dart';
 import 'package:du_xuan/viewmodels/home/home_viewmodel.dart';
 import 'package:du_xuan/viewmodels/itinerary/activity_form_viewmodel.dart';
 import 'package:du_xuan/viewmodels/itinerary/itinerary_viewmodel.dart';
@@ -93,6 +98,19 @@ ChecklistRepository _buildChecklistRepository() {
 ChecklistViewModel buildChecklistVM() =>
     ChecklistViewModel(_buildChecklistRepository());
 ChecklistRepository buildChecklistRepository() => _buildChecklistRepository();
+
+// ─── Expense ───────────────────────────────────────────
+
+ExpenseRepository _buildExpenseRepository() {
+  final api = ExpenseApi(_db);
+  final mapper = ExpenseMapper();
+  return ExpenseRepository(api: api, mapper: mapper);
+}
+
+IExpenseRepository buildExpenseRepository() => _buildExpenseRepository();
+
+ExpenseViewModel buildExpenseVM() =>
+    ExpenseViewModel(_buildExpenseRepository());
 
 NotificationRepository _buildNotificationRepository() {
   final api = NotificationApi(_db);

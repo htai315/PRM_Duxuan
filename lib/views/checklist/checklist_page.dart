@@ -107,7 +107,7 @@ class _ChecklistPageState extends State<ChecklistPage> {
     final categories = grouped.keys.toList();
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+      padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
       itemCount: categories.length,
       itemBuilder: (context, i) {
         final cat = categories[i];

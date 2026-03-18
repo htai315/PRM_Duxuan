@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:du_xuan/core/constants/app_colors.dart';
 import 'package:du_xuan/core/constants/app_text_styles.dart';
 import 'package:du_xuan/core/enums/activity_status.dart';
+import 'package:du_xuan/core/utils/activity_cost_ui.dart';
 import 'package:du_xuan/core/utils/app_feedback.dart';
 import 'package:du_xuan/domain/entities/plan_day.dart';
+import 'package:du_xuan/viewmodels/expense/expense_viewmodel.dart';
 import 'package:du_xuan/viewmodels/itinerary/itinerary_viewmodel.dart';
 import 'package:du_xuan/views/plan_detail/day_detail_page.dart';
 import 'package:du_xuan/views/shared/widgets/app_action_chip.dart';
@@ -13,14 +15,22 @@ import 'package:intl/intl.dart';
 /// Tab 1: Danh sách ngày — mỗi ngày là 1 card, bấm drill-down.
 class DayListTab extends StatelessWidget {
   final ItineraryViewModel viewModel;
+  final ExpenseViewModel expenseViewModel;
   final int planId;
+  final Future<void> Function()? onDayDetailClosed;
 
-  const DayListTab({super.key, required this.viewModel, required this.planId});
+  const DayListTab({
+    super.key,
+    required this.viewModel,
+    required this.expenseViewModel,
+    required this.planId,
+    this.onDayDetailClosed,
+  });
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: viewModel,
+      listenable: Listenable.merge([viewModel, expenseViewModel]),
       builder: (context, _) {
         final days = viewModel.days;
         if (days.isEmpty) {
@@ -70,13 +80,14 @@ class DayListTab extends StatelessWidget {
   Widget _dayCard(BuildContext context, PlanDay day) {
     final dateStr = DateFormat('EEEE, dd/MM', 'vi').format(day.date);
     final activities = viewModel.activitiesForDay(day.id);
+    final expenses = expenseViewModel.expensesForDay(day.id);
     final activityCount = activities.length;
     final doneCount = activities
         .where((a) => a.status == ActivityStatus.done)
         .length;
-    final totalCost = activities.fold<double>(
-      0,
-      (s, a) => s + (a.estimatedCost ?? 0),
+    final costSummary = ActivityCostUi.buildDaySummary(
+      activities: activities,
+      expenses: expenses,
     );
     final progress = activityCount > 0 ? doneCount / activityCount : 0.0;
     final isAllDone = activityCount > 0 && doneCount == activityCount;
@@ -98,12 +109,14 @@ class DayListTab extends StatelessWidget {
           MaterialPageRoute(
             builder: (_) => DayDetailPage(
               viewModel: viewModel,
+              expenseViewModel: expenseViewModel,
               dayIndex: day.dayNumber - 1,
               planId: planId,
             ),
           ),
         );
-        viewModel.loadPlan(planId);
+        await viewModel.loadPlan(planId);
+        await onDayDetailClosed?.call();
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
@@ -249,11 +262,11 @@ class DayListTab extends StatelessWidget {
                         ? AppColors.textMedium
                         : AppColors.textLight,
                   ),
-                  if (totalCost > 0) ...[
+                  if (costSummary.hasAnyCost) ...[
                     const SizedBox(width: 12),
                     _summaryChip(
                       icon: Icons.payments_rounded,
-                      text: _formatCost(totalCost),
+                      text: costSummary.dayChipLabel,
                       color: AppColors.goldDeep,
                     ),
                   ],
@@ -330,15 +343,6 @@ class DayListTab extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  String _formatCost(double cost) {
-    if (cost >= 1000000) {
-      return '${(cost / 1000000).toStringAsFixed(1)}tr';
-    } else if (cost >= 1000) {
-      return '${(cost / 1000).toStringAsFixed(0)}k';
-    }
-    return '₫${cost.toStringAsFixed(0)}';
   }
 
   // ─── Banners ─────────────────────────────────────────

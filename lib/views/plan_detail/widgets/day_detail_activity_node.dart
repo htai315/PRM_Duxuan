@@ -10,7 +10,7 @@ class DayDetailActivityNode extends StatelessWidget {
   final bool isLast;
   final Color typeColor;
   final bool hasLocation;
-  final String costLabel;
+  final String? costLabel;
   final VoidCallback onOpenDetail;
   final VoidCallback onToggleStatus;
   final VoidCallback onDelete;
@@ -263,12 +263,11 @@ class DayDetailActivityNode extends StatelessWidget {
                                               ? AppColors.textMedium
                                               : typeColor,
                                         ),
-                                        if (activity.estimatedCost != null &&
-                                            activity.estimatedCost! > 0)
+                                        if (costLabel != null)
                                           _DetailBadge(
                                             icon: Icons
                                                 .account_balance_wallet_rounded,
-                                            label: costLabel,
+                                            label: costLabel!,
                                             color: isDone
                                                 ? AppColors.textMedium
                                                 : AppColors.goldDeep,

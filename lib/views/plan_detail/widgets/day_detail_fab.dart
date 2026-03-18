@@ -3,39 +3,58 @@ import 'package:flutter/material.dart';
 
 class DayDetailFab extends StatelessWidget {
   final VoidCallback onTap;
+  final bool isExpenseOnly;
 
-  const DayDetailFab({super.key, required this.onTap});
+  const DayDetailFab({
+    super.key,
+    required this.onTap,
+    this.isExpenseOnly = false,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final accentColor = isExpenseOnly ? AppColors.goldDeep : AppColors.primary;
+
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Ink(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [AppColors.primary, AppColors.primaryDeep],
-            ),
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.9),
-              width: 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.3),
-                blurRadius: 14,
-                offset: const Offset(0, 6),
-              ),
-            ],
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: Ink(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isExpenseOnly
+                ? const [AppColors.gold, AppColors.goldDeep]
+                : const [AppColors.primary, AppColors.primaryDeep],
           ),
-          child: const Icon(Icons.add_rounded, color: Colors.white, size: 30),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.9),
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: accentColor.withValues(alpha: 0.3),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          splashColor: Colors.white.withValues(alpha: 0.12),
+          highlightColor: Colors.white.withValues(alpha: 0.06),
+          child: Center(
+            child: Icon(
+              isExpenseOnly ? Icons.receipt_long_rounded : Icons.add_rounded,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
         ),
       ),
     );

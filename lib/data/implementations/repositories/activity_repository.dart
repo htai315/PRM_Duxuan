@@ -13,8 +13,8 @@ class ActivityRepository implements IActivityRepository {
   ActivityRepository({
     required IActivityApi api,
     required IMapper<ActivityDto, Activity> mapper,
-  })  : _api = api,
-        _mapper = mapper;
+  }) : _api = api,
+       _mapper = mapper;
 
   @override
   Future<List<Activity>> getByPlanDayId(int planDayId) async {

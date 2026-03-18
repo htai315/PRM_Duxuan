@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:du_xuan/core/constants/app_colors.dart';
 import 'package:du_xuan/core/constants/app_text_styles.dart';
 import 'package:du_xuan/core/enums/activity_type.dart';
+import 'package:du_xuan/core/utils/app_currency_input_formatter.dart';
 import 'package:du_xuan/core/utils/app_form_validators.dart';
 import 'package:du_xuan/domain/entities/activity.dart';
 import 'package:du_xuan/viewmodels/itinerary/activity_form_viewmodel.dart';
 import 'package:du_xuan/views/itinerary/widgets/activity_form_app_bar.dart';
 import 'package:du_xuan/views/itinerary/widgets/activity_form_bottom_action.dart';
 import 'package:du_xuan/views/itinerary/widgets/activity_form_input.dart';
-import 'package:du_xuan/views/itinerary/widgets/activity_form_summary_card.dart';
 import 'package:du_xuan/views/itinerary/widgets/activity_form_type_selector.dart';
 import 'package:du_xuan/views/shared/widgets/app_form_section_card.dart';
 
@@ -61,7 +61,9 @@ class _ActivityFormPageState extends State<ActivityFormPage> {
       widget.viewModel.setExisting(existing);
       _titleCtrl.text = existing.title;
       _locationCtrl.text = existing.locationText ?? '';
-      _costCtrl.text = existing.estimatedCost?.toStringAsFixed(0) ?? '';
+      _costCtrl.text = AppCurrencyInputFormatter.formatStoredAmount(
+        existing.estimatedCost,
+      );
       _noteCtrl.text = existing.note ?? '';
       _selectedType = existing.activityType;
       _startTime = _parseTime(existing.startTime);
@@ -141,14 +143,6 @@ class _ActivityFormPageState extends State<ActivityFormPage> {
       controller: _scrollController,
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
       children: [
-        ActivityFormSummaryCard(
-          selectedType: _selectedType,
-          startLabel: _startTime != null ? _formatTime(_startTime)! : '--:--',
-          endLabel: _endTime != null ? _formatTime(_endTime)! : '--:--',
-          typeColor: _selectedType.color,
-        ),
-        const SizedBox(height: 20),
-
         AppFormSectionCard(
           title: 'Thông tin chính',
           subtitle: 'Tên và mô tả ngắn cho hoạt động của bạn',
@@ -280,6 +274,7 @@ class _ActivityFormPageState extends State<ActivityFormPage> {
                 icon: Icons.account_balance_wallet_rounded,
                 iconColor: AppColors.goldDeep,
                 keyboardType: TextInputType.number,
+                inputFormatters: [AppCurrencyInputFormatter()],
                 isBorderless: true,
                 onChanged: (value) {
                   widget.viewModel.clearError();

@@ -48,6 +48,4 @@ class ActivityDto {
       status: (map['status'] ?? 'TODO').toString(),
     );
   }
-
 }
-
