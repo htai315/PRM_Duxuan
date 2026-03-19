@@ -283,6 +283,11 @@ class _HomePageState extends State<HomePage> {
     );
 
     if (!mounted) return;
-    await _notificationVM.loadUnreadCount(userId);
+    await _refreshHomeData(
+      refreshNotifications: true,
+      syncReminders: true,
+      refreshMapIfVisible: true,
+      forceMapReload: true,
+    );
   }
 }

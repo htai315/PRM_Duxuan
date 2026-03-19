@@ -1,0 +1,34 @@
+import 'package:du_xuan/data/dtos/login/user_dto.dart';
+import 'package:du_xuan/data/implementations/local/db/app_database.dart';
+import 'package:du_xuan/data/interfaces/api/i_user_api.dart';
+
+class UserApi implements IUserApi {
+  final AppDatabase _database;
+
+  UserApi(this._database);
+
+  @override
+  Future<UserDto?> getById(int id) async {
+    final db = await _database.db;
+    final rows = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return UserDto.fromMap(rows.first);
+  }
+
+  @override
+  Future<List<UserDto>> getAll({int? excludeUserId}) async {
+    final db = await _database.db;
+    final rows = await db.query(
+      'users',
+      where: excludeUserId != null ? 'id != ?' : null,
+      whereArgs: excludeUserId != null ? [excludeUserId] : null,
+      orderBy: 'LOWER(full_name) ASC, LOWER(user_name) ASC',
+    );
+    return rows.map(UserDto.fromMap).toList();
+  }
+}

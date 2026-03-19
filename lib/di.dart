@@ -6,26 +6,38 @@ import 'package:du_xuan/data/implementations/api/geocoding_service.dart';
 import 'package:du_xuan/data/implementations/api/notification_api.dart';
 import 'package:du_xuan/data/implementations/api/openai_service.dart';
 import 'package:du_xuan/data/implementations/api/plan_api.dart';
+import 'package:du_xuan/data/implementations/api/plan_copy_api.dart';
+import 'package:du_xuan/data/implementations/api/plan_copy_source_api.dart';
 import 'package:du_xuan/data/implementations/api/public_share_link_api.dart';
 import 'package:du_xuan/data/implementations/api/public_share_remote_api.dart';
+import 'package:du_xuan/data/implementations/api/user_api.dart';
 import 'package:du_xuan/data/implementations/local/db/app_database.dart';
 import 'package:du_xuan/data/implementations/mapper/activity_mapper.dart';
 import 'package:du_xuan/data/implementations/mapper/auth_mapper.dart';
 import 'package:du_xuan/data/implementations/mapper/checklist_mapper.dart';
 import 'package:du_xuan/data/implementations/mapper/expense_mapper.dart';
 import 'package:du_xuan/data/implementations/mapper/notification_mapper.dart';
+import 'package:du_xuan/data/implementations/mapper/plan_copy_request_mapper.dart';
 import 'package:du_xuan/data/implementations/mapper/plan_mapper.dart';
+import 'package:du_xuan/data/implementations/mapper/plan_copy_source_mapper.dart';
 import 'package:du_xuan/data/implementations/mapper/public_share_link_mapper.dart';
+import 'package:du_xuan/data/implementations/mapper/user_mapper.dart';
 import 'package:du_xuan/data/implementations/repositories/activity_repository.dart';
 import 'package:du_xuan/data/implementations/repositories/auth_repository.dart';
 import 'package:du_xuan/data/implementations/repositories/checklist_repository.dart';
 import 'package:du_xuan/data/implementations/repositories/expense_repository.dart';
 import 'package:du_xuan/data/implementations/repositories/notification_repository.dart';
+import 'package:du_xuan/data/implementations/repositories/plan_copy_repository.dart';
+import 'package:du_xuan/data/implementations/repositories/plan_copy_source_repository.dart';
 import 'package:du_xuan/data/implementations/repositories/plan_repository.dart';
 import 'package:du_xuan/data/implementations/repositories/public_share_link_repository.dart';
+import 'package:du_xuan/data/implementations/repositories/user_repository.dart';
 import 'package:du_xuan/core/utils/notification_service.dart';
 import 'package:du_xuan/data/interfaces/repositories/i_expense_repository.dart';
+import 'package:du_xuan/data/interfaces/repositories/i_plan_copy_repository.dart';
+import 'package:du_xuan/data/interfaces/repositories/i_plan_copy_source_repository.dart';
 import 'package:du_xuan/data/interfaces/repositories/i_public_share_link_repository.dart';
+import 'package:du_xuan/data/interfaces/repositories/i_user_repository.dart';
 import 'package:du_xuan/viewmodels/checklist/checklist_viewmodel.dart';
 import 'package:du_xuan/viewmodels/checklist/suggestion_viewmodel.dart';
 import 'package:du_xuan/viewmodels/expense/expense_viewmodel.dart';
@@ -37,6 +49,9 @@ import 'package:du_xuan/viewmodels/notification/notification_viewmodel.dart';
 import 'package:du_xuan/viewmodels/plan/plan_form_viewmodel.dart';
 import 'package:du_xuan/viewmodels/plan/plan_list_viewmodel.dart';
 import 'package:du_xuan/viewmodels/register/register_viewmodel.dart';
+import 'package:du_xuan/viewmodels/share/plan_copy_share_viewmodel.dart';
+import 'package:du_xuan/viewmodels/share/plan_copy_request_viewmodel.dart';
+import 'package:du_xuan/viewmodels/share/plan_copy_source_viewmodel.dart';
 import 'package:du_xuan/viewmodels/settings/change_password_viewmodel.dart';
 import 'package:du_xuan/viewmodels/share/public_share_viewmodel.dart';
 import 'package:du_xuan/viewmodels/map/map_viewmodel.dart';
@@ -60,6 +75,14 @@ HomeViewModel buildHomeVM() => HomeViewModel(_buildAuthRepository());
 ChangePasswordViewModel buildChangePasswordVM() =>
     ChangePasswordViewModel(_buildAuthRepository());
 
+UserRepository _buildUserRepository() {
+  final api = UserApi(_db);
+  final mapper = UserMapper();
+  return UserRepository(api: api, mapper: mapper);
+}
+
+IUserRepository buildUserRepository() => _buildUserRepository();
+
 // ─── Plan ──────────────────────────────────────────────
 
 PlanRepository _buildPlanRepository() {
@@ -74,6 +97,23 @@ PlanListViewModel buildPlanListVM() =>
 PlanFormViewModel buildPlanFormVM() =>
     PlanFormViewModel(_buildPlanRepository(), buildNotificationService());
 PlanRepository buildPlanRepository() => _buildPlanRepository();
+
+PlanCopyRepository _buildPlanCopyRepository() {
+  final api = PlanCopyApi(_db);
+  final mapper = PlanCopyRequestMapper();
+  return PlanCopyRepository(api: api, mapper: mapper);
+}
+
+IPlanCopyRepository buildPlanCopyRepository() => _buildPlanCopyRepository();
+
+PlanCopySourceRepository _buildPlanCopySourceRepository() {
+  final api = PlanCopySourceApi(_db);
+  final mapper = PlanCopySourceMapper();
+  return PlanCopySourceRepository(api: api, mapper: mapper);
+}
+
+IPlanCopySourceRepository buildPlanCopySourceRepository() =>
+    _buildPlanCopySourceRepository();
 
 // ─── Itinerary ─────────────────────────────────────────
 
@@ -177,3 +217,14 @@ PublicShareViewModel buildPublicShareVM() => PublicShareViewModel(
   localRepository: _buildPublicShareLinkRepository(),
   remoteApi: _buildPublicShareRemoteApi(),
 );
+
+PlanCopyShareViewModel buildPlanCopyShareVM() => PlanCopyShareViewModel(
+  userRepository: _buildUserRepository(),
+  planCopyRepository: _buildPlanCopyRepository(),
+);
+
+PlanCopyRequestViewModel buildPlanCopyRequestVM() =>
+    PlanCopyRequestViewModel(_buildPlanCopyRepository());
+
+PlanCopySourceViewModel buildPlanCopySourceVM() =>
+    PlanCopySourceViewModel(_buildPlanCopySourceRepository());

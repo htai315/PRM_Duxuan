@@ -18,6 +18,8 @@ import 'package:du_xuan/views/plan_detail/tabs/day_list_tab.dart';
 import 'package:du_xuan/views/plan_detail/tabs/checklist_tab.dart';
 import 'package:du_xuan/views/plan_detail/tabs/expense_tab.dart';
 import 'package:du_xuan/views/plan_detail/tabs/locations_tab.dart';
+import 'package:du_xuan/views/plan_detail/widgets/plan_copy_share_sheet.dart';
+import 'package:du_xuan/viewmodels/share/plan_copy_source_viewmodel.dart';
 import 'package:du_xuan/viewmodels/share/public_share_viewmodel.dart';
 import 'package:du_xuan/views/shared/widgets/app_badge_chip.dart';
 import 'package:du_xuan/views/shared/widgets/app_circle_icon.dart';
@@ -46,6 +48,7 @@ class _PlanDetailPageState extends State<PlanDetailPage>
   late final ChecklistViewModel _checklistVM;
   late final ExpenseViewModel _expenseVM;
   late final PublicShareViewModel _publicShareVM;
+  late final PlanCopySourceViewModel _planCopySourceVM;
 
   @override
   void initState() {
@@ -54,15 +57,21 @@ class _PlanDetailPageState extends State<PlanDetailPage>
     _checklistVM = buildChecklistVM();
     _expenseVM = buildExpenseVM();
     _publicShareVM = buildPublicShareVM();
+    _planCopySourceVM = buildPlanCopySourceVM();
     widget.viewModel.loadPlan(widget.planId);
     _checklistVM.loadItems(widget.planId);
     _expenseVM.loadExpenses(widget.planId);
     _publicShareVM.loadLink(widget.planId);
+    _planCopySourceVM.loadSource(widget.planId);
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _checklistVM.dispose();
+    _expenseVM.dispose();
+    _publicShareVM.dispose();
+    _planCopySourceVM.dispose();
     super.dispose();
   }
 
@@ -74,6 +83,7 @@ class _PlanDetailPageState extends State<PlanDetailPage>
     _checklistVM.loadItems(widget.planId);
     _expenseVM.loadExpenses(widget.planId);
     _publicShareVM.loadLink(widget.planId, refresh: true);
+    _planCopySourceVM.loadSource(widget.planId);
   }
 
   @override
@@ -89,7 +99,11 @@ class _PlanDetailPageState extends State<PlanDetailPage>
         ),
         child: SafeArea(
           child: ListenableBuilder(
-            listenable: Listenable.merge([widget.viewModel, _publicShareVM]),
+            listenable: Listenable.merge([
+              widget.viewModel,
+              _publicShareVM,
+              _planCopySourceVM,
+            ]),
             builder: (context, _) {
               if (widget.viewModel.isLoading && widget.viewModel.plan == null) {
                 return const AppLoadingState(
@@ -192,6 +206,30 @@ class _PlanDetailPageState extends State<PlanDetailPage>
                     ),
                   ],
                 ),
+                if (_planCopySourceVM.source != null) ...[
+                  const SizedBox(height: 7),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.person_add_alt_1_rounded,
+                        size: 15,
+                        color: AppColors.textLight,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Nhận từ ${_planCopySourceVM.source!.sourceDisplayName}',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textMedium,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -229,6 +267,20 @@ class _PlanDetailPageState extends State<PlanDetailPage>
                     ),
                     SizedBox(width: 10),
                     Text('Chia sẻ văn bản'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'share_copy_to_user',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.person_add_alt_1_rounded,
+                      size: 18,
+                      color: AppColors.textMedium,
+                    ),
+                    SizedBox(width: 10),
+                    Text('Gửi lời mời nhận kế hoạch'),
                   ],
                 ),
               ),
@@ -430,6 +482,9 @@ class _PlanDetailPageState extends State<PlanDetailPage>
             : 'Kế hoạch chuyến đi';
         await Share.share(text, subject: subject);
         break;
+      case 'share_copy_to_user':
+        await _openPlanCopyShareSheet();
+        break;
       case 'create_public_link':
         await _createPublicLink();
         break;
@@ -446,6 +501,35 @@ class _PlanDetailPageState extends State<PlanDetailPage>
         await _revokePublicLink();
         break;
     }
+  }
+
+  Future<void> _openPlanCopyShareSheet() async {
+    final plan = widget.viewModel.plan;
+    if (plan == null) {
+      AppFeedback.showWarningSnack(
+        context,
+        'Kế hoạch hiện tại chưa sẵn sàng để chia sẻ.',
+      );
+      return;
+    }
+
+    final shareCopyVM = buildPlanCopyShareVM();
+    final result = await PlanCopyShareSheet.show(
+      context,
+      viewModel: shareCopyVM,
+      sourcePlanId: plan.id,
+      sourceUserId: plan.userId,
+      planName: plan.name,
+    );
+    shareCopyVM.dispose();
+
+    if (!mounted || result == null) return;
+
+    AppFeedback.showSuccessSnack(
+      context,
+      'Đã gửi lời mời nhận kế hoạch cho ${result.recipient.fullName}',
+      duration: const Duration(seconds: 3),
+    );
   }
 
   Future<void> _createPublicLink() async {

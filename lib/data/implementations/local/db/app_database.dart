@@ -44,6 +44,8 @@ class AppDatabase {
     await _createUsersTable(db);
     await _createSessionTable(db);
     await _createPlansTable(db);
+    await _createPlanCopyRequestsTable(db);
+    await _createPlanCopySourcesTable(db);
     await _createPublicShareLinksTable(db);
     await _createPlanDaysTable(db);
     await _createDestinationsTable(db);
@@ -113,6 +115,43 @@ class AppDatabase {
         last_synced_at TEXT NOT NULL,
         revoked_at TEXT,
         FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE
+      )
+    ''');
+  }
+
+  Future<void> _createPlanCopyRequestsTable(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS plan_copy_requests(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source_plan_id INTEGER NOT NULL,
+        source_user_id INTEGER NOT NULL,
+        target_user_id INTEGER NOT NULL,
+        target_plan_id INTEGER,
+        status TEXT NOT NULL DEFAULT 'PENDING',
+        created_at TEXT NOT NULL,
+        responded_at TEXT,
+        FOREIGN KEY (source_plan_id) REFERENCES plans(id) ON DELETE CASCADE,
+        FOREIGN KEY (source_user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (target_plan_id) REFERENCES plans(id) ON DELETE SET NULL
+      )
+    ''');
+  }
+
+  Future<void> _createPlanCopySourcesTable(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS plan_copy_sources(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source_plan_id INTEGER NOT NULL,
+        source_user_id INTEGER NOT NULL,
+        target_plan_id INTEGER NOT NULL UNIQUE,
+        target_user_id INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (source_plan_id) REFERENCES plans(id) ON DELETE CASCADE,
+        FOREIGN KEY (source_user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (target_plan_id) REFERENCES plans(id) ON DELETE CASCADE,
+        FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(source_plan_id, target_user_id)
       )
     ''');
   }
@@ -241,6 +280,21 @@ class AppDatabase {
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_public_share_links_last_synced_at ON public_share_links(last_synced_at)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_plan_copy_requests_target_user_status ON plan_copy_requests(target_user_id, status)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_plan_copy_requests_source_target ON plan_copy_requests(source_plan_id, target_user_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_plan_copy_requests_target_plan_id ON plan_copy_requests(target_plan_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_plan_copy_sources_target_plan_id ON plan_copy_sources(target_plan_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_plan_copy_sources_target_user_id ON plan_copy_sources(target_user_id)',
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_activities_plan_day_id ON activities(plan_day_id)',

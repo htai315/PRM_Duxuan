@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:du_xuan/core/constants/app_colors.dart';
@@ -6,15 +8,18 @@ import 'package:du_xuan/core/utils/app_feedback.dart';
 import 'package:du_xuan/core/utils/notification_service.dart';
 import 'package:du_xuan/core/utils/notification_ui.dart';
 import 'package:du_xuan/domain/entities/app_notification.dart';
+import 'package:du_xuan/domain/entities/plan_copy_request.dart';
 import 'package:du_xuan/routes/app_routes.dart';
 import 'package:du_xuan/routes/route_args.dart';
 import 'package:du_xuan/viewmodels/notification/notification_viewmodel.dart';
+import 'package:du_xuan/viewmodels/share/plan_copy_request_viewmodel.dart';
 import 'package:du_xuan/views/shared/widgets/app_action_chip.dart';
 import 'package:du_xuan/views/shared/widgets/app_badge_chip.dart';
 import 'package:du_xuan/views/shared/widgets/app_circle_icon.dart';
 import 'package:du_xuan/views/shared/widgets/app_empty_state.dart';
 import 'package:du_xuan/views/shared/widgets/app_header_text_group.dart';
 import 'package:du_xuan/views/shared/widgets/app_loading_state.dart';
+import 'package:du_xuan/di.dart';
 
 class NotificationPage extends StatefulWidget {
   final NotificationViewModel viewModel;
@@ -33,10 +38,19 @@ class NotificationPage extends StatefulWidget {
 }
 
 class _NotificationPageState extends State<NotificationPage> {
+  late final PlanCopyRequestViewModel _planCopyRequestVM =
+      buildPlanCopyRequestVM();
+
   @override
   void initState() {
     super.initState();
-    widget.viewModel.loadNotifications(widget.userId, refresh: true);
+    _loadPageData(refresh: true);
+  }
+
+  @override
+  void dispose() {
+    _planCopyRequestVM.dispose();
+    super.dispose();
   }
 
   @override
@@ -52,7 +66,10 @@ class _NotificationPageState extends State<NotificationPage> {
         ),
         child: SafeArea(
           child: ListenableBuilder(
-            listenable: widget.viewModel,
+            listenable: Listenable.merge([
+              widget.viewModel,
+              _planCopyRequestVM,
+            ]),
             builder: (context, _) {
               return Column(
                 children: [
@@ -139,7 +156,7 @@ class _NotificationPageState extends State<NotificationPage> {
 
     return RefreshIndicator(
       color: AppColors.primary,
-      onRefresh: () => vm.loadNotifications(widget.userId, refresh: true),
+      onRefresh: () => _loadPageData(refresh: true),
       child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         itemCount: vm.notifications.length,
@@ -153,6 +170,10 @@ class _NotificationPageState extends State<NotificationPage> {
   }
 
   Widget _notificationCard(AppNotification item) {
+    final requestId = _extractPlanCopyRequestId(item.payload);
+    final request = requestId == null
+        ? null
+        : _planCopyRequestVM.requestFor(requestId);
     final isUnread = !item.isRead;
     final cardColor = isUnread
         ? AppColors.primary.withValues(alpha: 0.08)
@@ -164,7 +185,9 @@ class _NotificationPageState extends State<NotificationPage> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => _openNotification(item),
+        onTap: _canOpenNotification(item, request)
+            ? () => _openNotification(item, request)
+            : null,
         borderRadius: BorderRadius.circular(18),
         child: Ink(
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -229,7 +252,10 @@ class _NotificationPageState extends State<NotificationPage> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         AppBadgeChip(
                           label: item.type.label,
@@ -238,7 +264,6 @@ class _NotificationPageState extends State<NotificationPage> {
                             item.type,
                           ).withValues(alpha: 0.12),
                         ),
-                        const SizedBox(width: 8),
                         Text(
                           NotificationUi.formatWhen(item),
                           style: AppTextStyles.bodySmall.copyWith(
@@ -246,8 +271,64 @@ class _NotificationPageState extends State<NotificationPage> {
                             fontSize: 11,
                           ),
                         ),
+                        if (request != null)
+                          AppBadgeChip(
+                            label: request.status.label,
+                            textColor: _requestStatusColor(request),
+                            backgroundColor: _requestStatusColor(
+                              request,
+                            ).withValues(alpha: 0.12),
+                            borderColor: _requestStatusColor(
+                              request,
+                            ).withValues(alpha: 0.18),
+                          ),
                       ],
                     ),
+                    if (request != null && request.isPending) ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: AppActionChip(
+                              label: _planCopyRequestVM.isSubmitting(request.id)
+                                  ? 'Đang xử lý...'
+                                  : 'Từ chối',
+                              icon: Icons.close_rounded,
+                              onTap: _planCopyRequestVM.isSubmitting(request.id)
+                                  ? null
+                                  : () => _rejectRequest(item, request),
+                              textColor: AppColors.textMedium,
+                              backgroundColor: AppColors.white,
+                              borderColor: AppColors.divider.withValues(
+                                alpha: 0.9,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: AppActionChip(
+                              label: _planCopyRequestVM.isSubmitting(request.id)
+                                  ? 'Đang xử lý...'
+                                  : 'Chấp nhận',
+                              icon: Icons.check_rounded,
+                              onTap: _planCopyRequestVM.isSubmitting(request.id)
+                                  ? null
+                                  : () => _acceptRequest(item, request),
+                              textColor: Colors.white,
+                              backgroundColor: AppColors.success,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -258,15 +339,24 @@ class _NotificationPageState extends State<NotificationPage> {
     );
   }
 
-  Future<void> _openNotification(AppNotification item) async {
+  Future<void> _openNotification(
+    AppNotification item,
+    PlanCopyRequest? request,
+  ) async {
+    final targetPlanId =
+        request?.isAccepted == true && request?.targetPlanId != null
+        ? request!.targetPlanId
+        : item.planId;
+    if (targetPlanId == null) return;
+
     if (!item.isRead) {
       await widget.viewModel.markAsRead(item);
     }
-    if (!mounted || item.planId == null) return;
+    if (!mounted) return;
     await Navigator.pushNamed(
       context,
       AppRoutes.itinerary,
-      arguments: ItineraryRouteArgs(planId: item.planId!),
+      arguments: ItineraryRouteArgs(planId: targetPlanId),
     );
   }
 
@@ -305,7 +395,99 @@ class _NotificationPageState extends State<NotificationPage> {
 
     Future.delayed(const Duration(seconds: 11), () {
       if (!mounted) return;
-      widget.viewModel.loadNotifications(widget.userId, refresh: true);
+      _loadPageData(refresh: true);
     });
+  }
+
+  Future<void> _loadPageData({required bool refresh}) async {
+    await widget.viewModel.loadNotifications(widget.userId, refresh: refresh);
+    if (!mounted) return;
+    await _loadPlanCopyRequests();
+  }
+
+  Future<void> _loadPlanCopyRequests() async {
+    final ids = widget.viewModel.notifications
+        .map((item) => _extractPlanCopyRequestId(item.payload))
+        .whereType<int>()
+        .toList();
+    await _planCopyRequestVM.loadRequestsByIds(ids);
+  }
+
+  bool _canOpenNotification(AppNotification item, PlanCopyRequest? request) {
+    if (request != null) {
+      return request.isAccepted && request.targetPlanId != null;
+    }
+    return item.planId != null;
+  }
+
+  int? _extractPlanCopyRequestId(String? payload) {
+    if (payload == null || payload.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(payload);
+      if (decoded is Map<String, dynamic>) {
+        final value = decoded['planCopyRequestId'];
+        if (value is int) return value;
+        return int.tryParse(value?.toString() ?? '');
+      }
+    } catch (_) {
+      return null;
+    }
+    return null;
+  }
+
+  Color _requestStatusColor(PlanCopyRequest request) {
+    if (request.isAccepted) return AppColors.success;
+    if (request.isRejected) return AppColors.error;
+    return AppColors.goldDeep;
+  }
+
+  Future<void> _acceptRequest(
+    AppNotification item,
+    PlanCopyRequest request,
+  ) async {
+    final newPlanId = await _planCopyRequestVM.acceptRequest(
+      requestId: request.id,
+      targetUserId: widget.userId,
+    );
+    if (!mounted || newPlanId == null) {
+      final message = _planCopyRequestVM.errorMessage;
+      if (message != null && mounted) {
+        AppFeedback.showErrorSnack(context, message);
+      }
+      return;
+    }
+
+    await widget.viewModel.markAsRead(item);
+    if (!mounted) return;
+    AppFeedback.showSuccessSnack(
+      context,
+      'Đã thêm kế hoạch vào tài khoản của bạn',
+    );
+  }
+
+  Future<void> _rejectRequest(
+    AppNotification item,
+    PlanCopyRequest request,
+  ) async {
+    final success = await _planCopyRequestVM.rejectRequest(
+      requestId: request.id,
+      targetUserId: widget.userId,
+    );
+    if (!mounted) return;
+    if (!success) {
+      final message = _planCopyRequestVM.errorMessage;
+      if (message != null) {
+        AppFeedback.showErrorSnack(context, message);
+      }
+      return;
+    }
+
+    await widget.viewModel.markAsRead(item);
+    if (!mounted) return;
+    AppFeedback.showSnack(
+      context,
+      message: 'Bạn đã từ chối lời mời nhận kế hoạch',
+      type: AppFeedbackType.info,
+    );
   }
 }
