@@ -44,6 +44,7 @@ class AppDatabase {
     await _createUsersTable(db);
     await _createSessionTable(db);
     await _createPlansTable(db);
+    await _createPublicShareLinksTable(db);
     await _createPlanDaysTable(db);
     await _createDestinationsTable(db);
     await _createActivitiesTable(db);
@@ -93,6 +94,25 @@ class AppDatabase {
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         FOREIGN KEY (user_id) REFERENCES users(id)
+      )
+    ''');
+  }
+
+  Future<void> _createPublicShareLinksTable(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS public_share_links(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        plan_id INTEGER NOT NULL UNIQUE,
+        share_id TEXT NOT NULL UNIQUE,
+        slug TEXT NOT NULL UNIQUE,
+        public_url TEXT NOT NULL,
+        owner_token TEXT NOT NULL,
+        snapshot_version INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        last_synced_at TEXT NOT NULL,
+        revoked_at TEXT,
+        FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE
       )
     ''');
   }
@@ -218,6 +238,9 @@ class AppDatabase {
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_plan_days_plan_id ON plan_days(plan_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_public_share_links_last_synced_at ON public_share_links(last_synced_at)',
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_activities_plan_day_id ON activities(plan_day_id)',

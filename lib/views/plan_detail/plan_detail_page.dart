@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:du_xuan/core/constants/app_colors.dart';
 import 'package:du_xuan/core/constants/app_text_styles.dart';
 import 'package:du_xuan/core/utils/app_feedback.dart';
@@ -16,6 +18,7 @@ import 'package:du_xuan/views/plan_detail/tabs/day_list_tab.dart';
 import 'package:du_xuan/views/plan_detail/tabs/checklist_tab.dart';
 import 'package:du_xuan/views/plan_detail/tabs/expense_tab.dart';
 import 'package:du_xuan/views/plan_detail/tabs/locations_tab.dart';
+import 'package:du_xuan/viewmodels/share/public_share_viewmodel.dart';
 import 'package:du_xuan/views/shared/widgets/app_badge_chip.dart';
 import 'package:du_xuan/views/shared/widgets/app_circle_icon.dart';
 import 'package:du_xuan/views/shared/widgets/app_loading_state.dart';
@@ -42,6 +45,7 @@ class _PlanDetailPageState extends State<PlanDetailPage>
   late final TabController _tabController;
   late final ChecklistViewModel _checklistVM;
   late final ExpenseViewModel _expenseVM;
+  late final PublicShareViewModel _publicShareVM;
 
   @override
   void initState() {
@@ -49,9 +53,11 @@ class _PlanDetailPageState extends State<PlanDetailPage>
     _tabController = TabController(length: 4, vsync: this);
     _checklistVM = buildChecklistVM();
     _expenseVM = buildExpenseVM();
+    _publicShareVM = buildPublicShareVM();
     widget.viewModel.loadPlan(widget.planId);
     _checklistVM.loadItems(widget.planId);
     _expenseVM.loadExpenses(widget.planId);
+    _publicShareVM.loadLink(widget.planId);
   }
 
   @override
@@ -67,6 +73,7 @@ class _PlanDetailPageState extends State<PlanDetailPage>
     widget.viewModel.loadPlan(widget.planId);
     _checklistVM.loadItems(widget.planId);
     _expenseVM.loadExpenses(widget.planId);
+    _publicShareVM.loadLink(widget.planId, refresh: true);
   }
 
   @override
@@ -82,7 +89,7 @@ class _PlanDetailPageState extends State<PlanDetailPage>
         ),
         child: SafeArea(
           child: ListenableBuilder(
-            listenable: widget.viewModel,
+            listenable: Listenable.merge([widget.viewModel, _publicShareVM]),
             builder: (context, _) {
               if (widget.viewModel.isLoading && widget.viewModel.plan == null) {
                 return const AppLoadingState(
@@ -101,7 +108,6 @@ class _PlanDetailPageState extends State<PlanDetailPage>
               return Column(
                 children: [
                   _buildAppBar(plan),
-                  const SizedBox(height: 4),
                   _buildTabBar(),
                   const SizedBox(height: 6),
                   Expanded(
@@ -141,6 +147,9 @@ class _PlanDetailPageState extends State<PlanDetailPage>
   Widget _buildAppBar(Plan plan) {
     final status = plan.statusBadgeLabel;
     final statusColor = PlanUi.statusColor(plan);
+    final publicShareLoaded = _publicShareVM.link != null;
+    final hasActivePublicLink = _publicShareVM.hasActiveLink;
+    final canCreatePublicLink = !hasActivePublicLink;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -210,7 +219,7 @@ class _PlanDetailPageState extends State<PlanDetailPage>
                   ),
                 ),
               const PopupMenuItem(
-                value: 'share',
+                value: 'share_text',
                 child: Row(
                   children: [
                     Icon(
@@ -219,10 +228,87 @@ class _PlanDetailPageState extends State<PlanDetailPage>
                       color: AppColors.textMedium,
                     ),
                     SizedBox(width: 10),
-                    Text('Chia sẻ'),
+                    Text('Chia sẻ văn bản'),
                   ],
                 ),
               ),
+              if (canCreatePublicLink)
+                PopupMenuItem(
+                  value: 'create_public_link',
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.public_rounded,
+                        size: 18,
+                        color: AppColors.textMedium,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        publicShareLoaded
+                            ? 'Tạo link công khai mới'
+                            : 'Tạo link công khai',
+                      ),
+                    ],
+                  ),
+                ),
+              if (hasActivePublicLink) ...[
+                const PopupMenuItem(
+                  value: 'open_public_link',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.open_in_new_rounded,
+                        size: 18,
+                        color: AppColors.textMedium,
+                      ),
+                      SizedBox(width: 10),
+                      Text('Mở link công khai'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'copy_public_link',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.link_rounded,
+                        size: 18,
+                        color: AppColors.textMedium,
+                      ),
+                      SizedBox(width: 10),
+                      Text('Sao chép link'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'update_public_link',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.sync_rounded,
+                        size: 18,
+                        color: AppColors.textMedium,
+                      ),
+                      SizedBox(width: 10),
+                      Text('Cập nhật link'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'revoke_public_link',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.link_off_rounded,
+                        size: 18,
+                        color: AppColors.error,
+                      ),
+                      SizedBox(width: 10),
+                      Text('Thu hồi link'),
+                    ],
+                  ),
+                ),
+              ],
             ],
             child: AppCircleIconSurface(
               icon: Icons.more_horiz_rounded,
@@ -237,7 +323,7 @@ class _PlanDetailPageState extends State<PlanDetailPage>
 
   Widget _buildTabBar() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: AppColors.white.withValues(alpha: 0.75),
@@ -317,6 +403,8 @@ class _PlanDetailPageState extends State<PlanDetailPage>
   }
 
   Future<void> _handleMenuAction(String action) async {
+    if (_publicShareVM.isSubmitting) return;
+
     switch (action) {
       case 'edit':
         final result = await Navigator.pushNamed(
@@ -335,10 +423,144 @@ class _PlanDetailPageState extends State<PlanDetailPage>
           );
         }
         break;
-      case 'share':
+      case 'share_text':
         final text = await PlanShareBuilder.build(widget.planId);
-        await Share.share(text, subject: 'Kế hoạch chuyến đi');
+        final subject = widget.viewModel.plan?.name.trim().isNotEmpty == true
+            ? widget.viewModel.plan!.name
+            : 'Kế hoạch chuyến đi';
+        await Share.share(text, subject: subject);
         break;
+      case 'create_public_link':
+        await _createPublicLink();
+        break;
+      case 'open_public_link':
+        await _openPublicLink();
+        break;
+      case 'copy_public_link':
+        await _copyPublicLink();
+        break;
+      case 'update_public_link':
+        await _updatePublicLink();
+        break;
+      case 'revoke_public_link':
+        await _revokePublicLink();
+        break;
+    }
+  }
+
+  Future<void> _createPublicLink() async {
+    final confirmed = await AppFeedback.showConfirmDialog(
+      context: context,
+      title: 'Tạo link công khai',
+      message:
+          'Link này sẽ hiển thị công khai kế hoạch, lịch trình, chi tiêu và checklist cho bất kỳ ai có link.',
+      confirmText: 'Tạo link',
+    );
+    if (!confirmed) return;
+
+    final link = await _publicShareVM.createLink(widget.planId);
+    if (!mounted) return;
+
+    if (link != null) {
+      await Clipboard.setData(ClipboardData(text: link.publicUrl));
+      if (!mounted) return;
+      AppFeedback.showSuccessSnack(
+        context,
+        'Đã tạo link công khai và sao chép vào clipboard',
+        duration: const Duration(seconds: 3),
+      );
+    } else {
+      AppFeedback.showErrorSnack(
+        context,
+        _publicShareVM.errorMessage ?? 'Không thể tạo link công khai',
+        duration: const Duration(seconds: 3),
+      );
+    }
+  }
+
+  Future<void> _copyPublicLink() async {
+    final link = _publicShareVM.link;
+    if (link == null || link.isRevoked) {
+      AppFeedback.showWarningSnack(context, 'Kế hoạch chưa có link công khai.');
+      return;
+    }
+
+    await Clipboard.setData(ClipboardData(text: link.publicUrl));
+    if (!mounted) return;
+    AppFeedback.showSuccessSnack(context, 'Đã sao chép link công khai');
+  }
+
+  Future<void> _openPublicLink() async {
+    final link = _publicShareVM.link;
+    if (link == null || link.isRevoked) {
+      AppFeedback.showWarningSnack(context, 'Kế hoạch chưa có link công khai.');
+      return;
+    }
+
+    final uri = Uri.tryParse(link.publicUrl);
+    if (uri == null) {
+      AppFeedback.showErrorSnack(
+        context,
+        'Link công khai hiện tại không hợp lệ.',
+      );
+      return;
+    }
+
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!mounted) return;
+    if (!launched) {
+      AppFeedback.showErrorSnack(
+        context,
+        'Không thể mở link công khai trên thiết bị này.',
+      );
+    }
+  }
+
+  Future<void> _updatePublicLink() async {
+    final link = await _publicShareVM.updateLink(widget.planId);
+    if (!mounted) return;
+
+    if (link != null) {
+      AppFeedback.showSuccessSnack(
+        context,
+        'Đã cập nhật link công khai',
+        duration: const Duration(seconds: 3),
+      );
+    } else {
+      AppFeedback.showErrorSnack(
+        context,
+        _publicShareVM.errorMessage ?? 'Không thể cập nhật link công khai',
+        duration: const Duration(seconds: 3),
+      );
+    }
+  }
+
+  Future<void> _revokePublicLink() async {
+    final confirmed = await AppFeedback.showConfirmDialog(
+      context: context,
+      title: 'Thu hồi link',
+      message:
+          'Link công khai hiện tại sẽ không còn truy cập được sau khi thu hồi.',
+      confirmText: 'Thu hồi',
+      destructive: true,
+    );
+    if (!confirmed) return;
+
+    final success = await _publicShareVM.revokeLink(widget.planId);
+    if (!mounted) return;
+
+    if (success) {
+      AppFeedback.showSuccessSnack(
+        context,
+        'Đã thu hồi link công khai',
+        duration: const Duration(seconds: 3),
+      );
+    } else {
+      AppFeedback.showErrorSnack(
+        context,
+        _publicShareVM.errorMessage ?? 'Không thể thu hồi link công khai',
+        duration: const Duration(seconds: 3),
+      );
     }
   }
 }
