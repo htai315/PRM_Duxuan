@@ -8,8 +8,6 @@ import 'package:du_xuan/core/enums/notification_type.dart';
 import 'package:du_xuan/data/interfaces/repositories/i_notification_repository.dart';
 import 'package:du_xuan/domain/entities/app_notification.dart';
 import 'package:du_xuan/domain/entities/plan.dart';
-import 'package:du_xuan/routes/app_routes.dart';
-import 'package:du_xuan/routes/route_args.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -28,6 +26,7 @@ class NotificationService {
 
   final FlutterLocalNotificationsPlugin _plugin;
   final INotificationRepository _notificationRepo;
+  void Function(int planId)? onNavigateToPlan;
 
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -36,6 +35,7 @@ class NotificationService {
 
   NotificationService({
     required INotificationRepository notificationRepo,
+    this.onNavigateToPlan,
     FlutterLocalNotificationsPlugin? plugin,
   }) : _notificationRepo = notificationRepo,
        _plugin = plugin ?? FlutterLocalNotificationsPlugin() {
@@ -144,10 +144,11 @@ class NotificationService {
     final now = DateTime.now();
 
     for (final spec in reminders) {
+      final triggerDate = start.add(Duration(days: spec.dayOffset));
       final trigger = DateTime(
-        start.year,
-        start.month,
-        start.day + spec.dayOffset,
+        triggerDate.year,
+        triggerDate.month,
+        triggerDate.day,
         spec.hour,
         spec.minute,
         0,
@@ -337,13 +338,8 @@ class NotificationService {
   void handlePendingNavigation() {
     final planId = _pendingPlanId;
     if (planId == null) return;
-    final nav = navigatorKey.currentState;
-    if (nav == null) return;
     _pendingPlanId = null;
-    nav.pushNamed(
-      AppRoutes.itinerary,
-      arguments: ItineraryRouteArgs(planId: planId),
-    );
+    _navigateToPlan(planId);
   }
 
   bool _shouldSchedule(Plan plan) {
@@ -390,6 +386,15 @@ class NotificationService {
 
   String _eventKey(int planId, String code) => 'plan:$planId:$code';
 
+  void _navigateToPlan(int planId) {
+    final callback = onNavigateToPlan;
+    if (callback != null) {
+      callback(planId);
+    } else {
+      _pendingPlanId = planId;
+    }
+  }
+
   Future<void> _handleNotificationTap(NotificationResponse response) async {
     final payload = response.payload;
     if (payload == null || payload.isEmpty) return;
@@ -418,15 +423,7 @@ class NotificationService {
       }
 
       if (planId != null) {
-        final nav = navigatorKey.currentState;
-        if (nav != null) {
-          nav.pushNamed(
-            AppRoutes.itinerary,
-            arguments: ItineraryRouteArgs(planId: planId),
-          );
-        } else {
-          _pendingPlanId = planId;
-        }
+        _navigateToPlan(planId);
       }
     } catch (_) {
       // Ignore payload parse errors.

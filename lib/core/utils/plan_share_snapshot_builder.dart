@@ -3,7 +3,6 @@ import 'package:du_xuan/data/interfaces/repositories/i_activity_repository.dart'
 import 'package:du_xuan/data/interfaces/repositories/i_checklist_repository.dart';
 import 'package:du_xuan/data/interfaces/repositories/i_expense_repository.dart';
 import 'package:du_xuan/data/interfaces/repositories/i_plan_repository.dart';
-import 'package:du_xuan/di.dart';
 import 'package:du_xuan/domain/entities/activity.dart';
 import 'package:du_xuan/domain/entities/plan.dart';
 import 'package:du_xuan/domain/entities/plan_day.dart';
@@ -14,23 +13,18 @@ class PlanShareSnapshotBuilder {
 
   static Future<PlanPublicShareSnapshotDto?> build(
     int planId, {
-    IPlanRepository? planRepo,
-    IActivityRepository? activityRepo,
-    IChecklistRepository? checklistRepo,
-    IExpenseRepository? expenseRepo,
+    required IPlanRepository planRepo,
+    required IActivityRepository activityRepo,
+    required IChecklistRepository checklistRepo,
+    required IExpenseRepository expenseRepo,
     DateTime? generatedAt,
   }) async {
-    final resolvedPlanRepo = planRepo ?? buildPlanRepository();
-    final resolvedActivityRepo = activityRepo ?? buildActivityRepository();
-    final resolvedChecklistRepo = checklistRepo ?? buildChecklistRepository();
-    final resolvedExpenseRepo = expenseRepo ?? buildExpenseRepository();
-
-    final plan = await resolvedPlanRepo.getById(planId);
+    final plan = await planRepo.getById(planId);
     if (plan == null) return null;
 
-    final activitiesFuture = _loadActivitiesByDay(plan, resolvedActivityRepo);
-    final checklistFuture = resolvedChecklistRepo.getByPlanId(planId);
-    final expensesFuture = resolvedExpenseRepo.getByPlanId(planId);
+    final activitiesFuture = _loadActivitiesByDay(plan, activityRepo);
+    final checklistFuture = checklistRepo.getByPlanId(planId);
+    final expensesFuture = expenseRepo.getByPlanId(planId);
 
     final activitiesByDay = await activitiesFuture;
     final checklistItems = await checklistFuture;
@@ -47,10 +41,10 @@ class PlanShareSnapshotBuilder {
 
   static Future<Map<String, dynamic>?> buildJson(
     int planId, {
-    IPlanRepository? planRepo,
-    IActivityRepository? activityRepo,
-    IChecklistRepository? checklistRepo,
-    IExpenseRepository? expenseRepo,
+    required IPlanRepository planRepo,
+    required IActivityRepository activityRepo,
+    required IChecklistRepository checklistRepo,
+    required IExpenseRepository expenseRepo,
     DateTime? generatedAt,
   }) async {
     final snapshot = await build(
@@ -79,3 +73,4 @@ class PlanShareSnapshotBuilder {
     return Map<PlanDay, List<Activity>>.fromEntries(entries);
   }
 }
+

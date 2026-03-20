@@ -44,37 +44,39 @@ class AuthApi implements IAuthApi {
   Future<LoginResponseDto> register(RegisterRequestDto req) async {
     final db = await _database.db;
 
-    // Kiểm tra username đã tồn tại chưa
-    final existing = await db.query(
-      'users',
-      where: 'user_name = ?',
-      whereArgs: [req.userName],
-      limit: 1,
-    );
+    return db.transaction<LoginResponseDto>((txn) async {
+      // Kiểm tra username đã tồn tại chưa
+      final existing = await txn.query(
+        'users',
+        where: 'user_name = ?',
+        whereArgs: [req.userName],
+        limit: 1,
+      );
 
-    if (existing.isNotEmpty) {
-      throw Exception('Tên đăng nhập đã tồn tại');
-    }
+      if (existing.isNotEmpty) {
+        throw Exception('Tên đăng nhập đã tồn tại');
+      }
 
-    // Tạo user mới
-    final now = DateTime.now().toIso8601String();
-    final userId = await db.insert('users', {
-      'user_name': req.userName,
-      'full_name': req.fullName,
-      'password_hash': PasswordHasher.sha256Hash(req.password),
-      'created_at': now,
+      // Tạo user mới
+      final now = DateTime.now().toIso8601String();
+      final userId = await txn.insert('users', {
+        'user_name': req.userName,
+        'full_name': req.fullName,
+        'password_hash': PasswordHasher.sha256Hash(req.password),
+        'created_at': now,
+      });
+
+      // Lấy user vừa tạo
+      final rows = await txn.query(
+        'users',
+        where: 'id = ?',
+        whereArgs: [userId],
+        limit: 1,
+      );
+
+      // Tự động đăng nhập sau đăng ký
+      return _createSession(txn, rows.first);
     });
-
-    // Lấy user vừa tạo
-    final rows = await db.query(
-      'users',
-      where: 'id = ?',
-      whereArgs: [userId],
-      limit: 1,
-    );
-
-    // Tự động đăng nhập sau đăng ký
-    return _createSession(db, rows.first);
   }
 
   @override
@@ -113,7 +115,7 @@ class AuthApi implements IAuthApi {
 
   /// Tạo session token và lưu vào DB, trả về LoginResponseDto
   Future<LoginResponseDto> _createSession(
-    Database db,
+    DatabaseExecutor db,
     Map<String, dynamic> userRow,
   ) async {
     final userId = userRow['id'] as int;

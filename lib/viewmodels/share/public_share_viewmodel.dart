@@ -2,6 +2,10 @@ import 'package:du_xuan/core/utils/plan_share_snapshot_builder.dart';
 import 'package:du_xuan/data/dtos/share/create_public_share_request_dto.dart';
 import 'package:du_xuan/data/dtos/share/update_public_share_request_dto.dart';
 import 'package:du_xuan/data/interfaces/api/i_public_share_remote_api.dart';
+import 'package:du_xuan/data/interfaces/repositories/i_activity_repository.dart';
+import 'package:du_xuan/data/interfaces/repositories/i_checklist_repository.dart';
+import 'package:du_xuan/data/interfaces/repositories/i_expense_repository.dart';
+import 'package:du_xuan/data/interfaces/repositories/i_plan_repository.dart';
 import 'package:du_xuan/data/interfaces/repositories/i_public_share_link_repository.dart';
 import 'package:du_xuan/domain/entities/public_share_link.dart';
 import 'package:flutter/material.dart';
@@ -9,12 +13,24 @@ import 'package:flutter/material.dart';
 class PublicShareViewModel extends ChangeNotifier {
   final IPublicShareLinkRepository _localRepository;
   final IPublicShareRemoteApi _remoteApi;
+  final IPlanRepository _planRepository;
+  final IActivityRepository _activityRepository;
+  final IChecklistRepository _checklistRepository;
+  final IExpenseRepository _expenseRepository;
 
   PublicShareViewModel({
     required IPublicShareLinkRepository localRepository,
     required IPublicShareRemoteApi remoteApi,
+    required IPlanRepository planRepository,
+    required IActivityRepository activityRepository,
+    required IChecklistRepository checklistRepository,
+    required IExpenseRepository expenseRepository,
   }) : _localRepository = localRepository,
-       _remoteApi = remoteApi;
+       _remoteApi = remoteApi,
+       _planRepository = planRepository,
+       _activityRepository = activityRepository,
+       _checklistRepository = checklistRepository,
+       _expenseRepository = expenseRepository;
 
   PublicShareLink? _link;
   bool _isLoading = false;
@@ -53,7 +69,7 @@ class PublicShareViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final snapshot = await PlanShareSnapshotBuilder.buildJson(planId);
+      final snapshot = await _buildSnapshot(planId);
       if (snapshot == null) {
         throw Exception('Không tìm thấy kế hoạch để tạo link công khai.');
       }
@@ -121,7 +137,7 @@ class PublicShareViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final snapshot = await PlanShareSnapshotBuilder.buildJson(planId);
+      final snapshot = await _buildSnapshot(planId);
       if (snapshot == null) {
         throw Exception('Không tìm thấy kế hoạch để cập nhật link.');
       }
@@ -217,5 +233,15 @@ class PublicShareViewModel extends ChangeNotifier {
 
   String _normalizeError(Object error) {
     return error.toString().replaceFirst('Exception: ', '');
+  }
+
+  Future<Map<String, dynamic>?> _buildSnapshot(int planId) {
+    return PlanShareSnapshotBuilder.buildJson(
+      planId,
+      planRepo: _planRepository,
+      activityRepo: _activityRepository,
+      checklistRepo: _checklistRepository,
+      expenseRepo: _expenseRepository,
+    );
   }
 }

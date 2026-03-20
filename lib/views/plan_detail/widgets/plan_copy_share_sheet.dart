@@ -113,7 +113,7 @@ class _PlanCopyShareSheetState extends State<PlanCopyShareSheet> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Người nhận sẽ thấy lời mời trong thông báo và có thể chấp nhận hoặc từ chối kế hoạch "${widget.planName}".',
+                      'Tìm tài khoản muốn nhận bản sao kế hoạch. Người nhận sẽ thấy lời mời trong thông báo và có thể chấp nhận hoặc từ chối kế hoạch "${widget.planName}".',
                       style: AppTextStyles.bodySmall.copyWith(
                         color: AppColors.textMedium,
                         height: 1.35,
@@ -238,7 +238,7 @@ class _PlanCopyShareSheetState extends State<PlanCopyShareSheet> {
     if (widget.viewModel.users.isEmpty) {
       return Center(
         child: Text(
-          'Không tìm thấy tài khoản phù hợp.',
+          'Không tìm thấy tài khoản phù hợp để gửi kế hoạch.',
           style: AppTextStyles.bodySmall.copyWith(
             color: AppColors.textLight,
             fontWeight: FontWeight.w600,

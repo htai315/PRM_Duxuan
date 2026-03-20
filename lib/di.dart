@@ -60,10 +60,14 @@ AppDatabase get _db => AppDatabase.instance;
 
 // ─── Auth ──────────────────────────────────────────────
 
+AuthRepository? _authRepository;
+
 AuthRepository _buildAuthRepository() {
-  final api = AuthApi(_db);
-  final mapper = AuthSessionMapper();
-  return AuthRepository(api: api, mapper: mapper);
+  _authRepository ??= AuthRepository(
+    api: AuthApi(_db),
+    mapper: AuthSessionMapper(),
+  );
+  return _authRepository!;
 }
 
 AuthRepository buildAuthRepository() => _buildAuthRepository();
@@ -75,21 +79,26 @@ HomeViewModel buildHomeVM() => HomeViewModel(_buildAuthRepository());
 ChangePasswordViewModel buildChangePasswordVM() =>
     ChangePasswordViewModel(_buildAuthRepository());
 
+UserRepository? _userRepository;
+
 UserRepository _buildUserRepository() {
-  final api = UserApi(_db);
-  final mapper = UserMapper();
-  return UserRepository(api: api, mapper: mapper);
+  _userRepository ??= UserRepository(api: UserApi(_db), mapper: UserMapper());
+  return _userRepository!;
 }
 
 IUserRepository buildUserRepository() => _buildUserRepository();
 
 // ─── Plan ──────────────────────────────────────────────
 
+PlanRepository? _planRepository;
+
 PlanRepository _buildPlanRepository() {
-  final api = PlanApi(_db);
-  final planMapper = PlanMapper();
-  final dayMapper = PlanDayMapper();
-  return PlanRepository(api: api, planMapper: planMapper, dayMapper: dayMapper);
+  _planRepository ??= PlanRepository(
+    api: PlanApi(_db),
+    planMapper: PlanMapper(),
+    dayMapper: PlanDayMapper(),
+  );
+  return _planRepository!;
 }
 
 PlanListViewModel buildPlanListVM() =>
@@ -98,18 +107,26 @@ PlanFormViewModel buildPlanFormVM() =>
     PlanFormViewModel(_buildPlanRepository(), buildNotificationService());
 PlanRepository buildPlanRepository() => _buildPlanRepository();
 
+PlanCopyRepository? _planCopyRepository;
+
 PlanCopyRepository _buildPlanCopyRepository() {
-  final api = PlanCopyApi(_db);
-  final mapper = PlanCopyRequestMapper();
-  return PlanCopyRepository(api: api, mapper: mapper);
+  _planCopyRepository ??= PlanCopyRepository(
+    api: PlanCopyApi(_db),
+    mapper: PlanCopyRequestMapper(),
+  );
+  return _planCopyRepository!;
 }
 
 IPlanCopyRepository buildPlanCopyRepository() => _buildPlanCopyRepository();
 
+PlanCopySourceRepository? _planCopySourceRepository;
+
 PlanCopySourceRepository _buildPlanCopySourceRepository() {
-  final api = PlanCopySourceApi(_db);
-  final mapper = PlanCopySourceMapper();
-  return PlanCopySourceRepository(api: api, mapper: mapper);
+  _planCopySourceRepository ??= PlanCopySourceRepository(
+    api: PlanCopySourceApi(_db),
+    mapper: PlanCopySourceMapper(),
+  );
+  return _planCopySourceRepository!;
 }
 
 IPlanCopySourceRepository buildPlanCopySourceRepository() =>
@@ -117,10 +134,14 @@ IPlanCopySourceRepository buildPlanCopySourceRepository() =>
 
 // ─── Itinerary ─────────────────────────────────────────
 
+ActivityRepository? _activityRepository;
+
 ActivityRepository _buildActivityRepository() {
-  final api = ActivityApi(_db);
-  final mapper = ActivityMapper();
-  return ActivityRepository(api: api, mapper: mapper);
+  _activityRepository ??= ActivityRepository(
+    api: ActivityApi(_db),
+    mapper: ActivityMapper(),
+  );
+  return _activityRepository!;
 }
 
 ItineraryViewModel buildItineraryVM() => ItineraryViewModel(
@@ -135,10 +156,14 @@ ActivityRepository buildActivityRepository() => _buildActivityRepository();
 
 // ─── Checklist ─────────────────────────────────────────
 
+ChecklistRepository? _checklistRepository;
+
 ChecklistRepository _buildChecklistRepository() {
-  final api = ChecklistApi(_db);
-  final mapper = ChecklistMapper();
-  return ChecklistRepository(api: api, mapper: mapper);
+  _checklistRepository ??= ChecklistRepository(
+    api: ChecklistApi(_db),
+    mapper: ChecklistMapper(),
+  );
+  return _checklistRepository!;
 }
 
 ChecklistViewModel buildChecklistVM() =>
@@ -147,10 +172,14 @@ ChecklistRepository buildChecklistRepository() => _buildChecklistRepository();
 
 // ─── Expense ───────────────────────────────────────────
 
+ExpenseRepository? _expenseRepository;
+
 ExpenseRepository _buildExpenseRepository() {
-  final api = ExpenseApi(_db);
-  final mapper = ExpenseMapper();
-  return ExpenseRepository(api: api, mapper: mapper);
+  _expenseRepository ??= ExpenseRepository(
+    api: ExpenseApi(_db),
+    mapper: ExpenseMapper(),
+  );
+  return _expenseRepository!;
 }
 
 IExpenseRepository buildExpenseRepository() => _buildExpenseRepository();
@@ -158,10 +187,14 @@ IExpenseRepository buildExpenseRepository() => _buildExpenseRepository();
 ExpenseViewModel buildExpenseVM() =>
     ExpenseViewModel(_buildExpenseRepository());
 
+NotificationRepository? _notificationRepository;
+
 NotificationRepository _buildNotificationRepository() {
-  final api = NotificationApi(_db);
-  final mapper = NotificationMapper();
-  return NotificationRepository(api: api, mapper: mapper);
+  _notificationRepository ??= NotificationRepository(
+    api: NotificationApi(_db),
+    mapper: NotificationMapper(),
+  );
+  return _notificationRepository!;
 }
 
 NotificationRepository buildNotificationRepository() =>
@@ -202,10 +235,14 @@ MapViewModel buildMapVM() => MapViewModel(
 
 // ─── Public Share ─────────────────────────────────────
 
+PublicShareLinkRepository? _publicShareLinkRepository;
+
 PublicShareLinkRepository _buildPublicShareLinkRepository() {
-  final api = PublicShareLinkApi(_db);
-  final mapper = PublicShareLinkMapper();
-  return PublicShareLinkRepository(api: api, mapper: mapper);
+  _publicShareLinkRepository ??= PublicShareLinkRepository(
+    api: PublicShareLinkApi(_db),
+    mapper: PublicShareLinkMapper(),
+  );
+  return _publicShareLinkRepository!;
 }
 
 IPublicShareLinkRepository buildPublicShareLinkRepository() =>
@@ -216,6 +253,10 @@ PublicShareRemoteApi _buildPublicShareRemoteApi() => PublicShareRemoteApi();
 PublicShareViewModel buildPublicShareVM() => PublicShareViewModel(
   localRepository: _buildPublicShareLinkRepository(),
   remoteApi: _buildPublicShareRemoteApi(),
+  planRepository: _buildPlanRepository(),
+  activityRepository: _buildActivityRepository(),
+  checklistRepository: _buildChecklistRepository(),
+  expenseRepository: _buildExpenseRepository(),
 );
 
 PlanCopyShareViewModel buildPlanCopyShareVM() => PlanCopyShareViewModel(

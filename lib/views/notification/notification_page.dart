@@ -170,10 +170,10 @@ class _NotificationPageState extends State<NotificationPage> {
   }
 
   Widget _notificationCard(AppNotification item) {
-    final requestId = _extractPlanCopyRequestId(item.payload);
-    final request = requestId == null
+    final planCopyRequestId = _extractPlanCopyRequestId(item.payload);
+    final planCopyRequest = planCopyRequestId == null
         ? null
-        : _planCopyRequestVM.requestFor(requestId);
+        : _planCopyRequestVM.requestFor(planCopyRequestId);
     final isUnread = !item.isRead;
     final cardColor = isUnread
         ? AppColors.primary.withValues(alpha: 0.08)
@@ -185,8 +185,8 @@ class _NotificationPageState extends State<NotificationPage> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: _canOpenNotification(item, request)
-            ? () => _openNotification(item, request)
+        onTap: _canOpenNotification(item, planCopyRequest)
+            ? () => _openNotification(item, planCopyRequest)
             : null,
         borderRadius: BorderRadius.circular(18),
         child: Ink(
@@ -271,32 +271,44 @@ class _NotificationPageState extends State<NotificationPage> {
                             fontSize: 11,
                           ),
                         ),
-                        if (request != null)
+                        if (planCopyRequest != null)
                           AppBadgeChip(
-                            label: request.status.label,
-                            textColor: _requestStatusColor(request),
-                            backgroundColor: _requestStatusColor(
-                              request,
+                            label: planCopyRequest.status.label,
+                            textColor: _planCopyRequestStatusColor(
+                              planCopyRequest,
+                            ),
+                            backgroundColor: _planCopyRequestStatusColor(
+                              planCopyRequest,
                             ).withValues(alpha: 0.12),
-                            borderColor: _requestStatusColor(
-                              request,
+                            borderColor: _planCopyRequestStatusColor(
+                              planCopyRequest,
                             ).withValues(alpha: 0.18),
                           ),
                       ],
                     ),
-                    if (request != null && request.isPending) ...[
+                    if (planCopyRequest != null &&
+                        planCopyRequest.isPending) ...[
                       const SizedBox(height: 10),
                       Row(
                         children: [
                           Expanded(
                             child: AppActionChip(
-                              label: _planCopyRequestVM.isSubmitting(request.id)
+                              label:
+                                  _planCopyRequestVM.isSubmitting(
+                                    planCopyRequest.id,
+                                  )
                                   ? 'Đang xử lý...'
                                   : 'Từ chối',
                               icon: Icons.close_rounded,
-                              onTap: _planCopyRequestVM.isSubmitting(request.id)
+                              onTap:
+                                  _planCopyRequestVM.isSubmitting(
+                                    planCopyRequest.id,
+                                  )
                                   ? null
-                                  : () => _rejectRequest(item, request),
+                                  : () => _rejectPlanCopyRequest(
+                                      item,
+                                      planCopyRequest,
+                                    ),
                               textColor: AppColors.textMedium,
                               backgroundColor: AppColors.white,
                               borderColor: AppColors.divider.withValues(
@@ -311,13 +323,22 @@ class _NotificationPageState extends State<NotificationPage> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: AppActionChip(
-                              label: _planCopyRequestVM.isSubmitting(request.id)
+                              label:
+                                  _planCopyRequestVM.isSubmitting(
+                                    planCopyRequest.id,
+                                  )
                                   ? 'Đang xử lý...'
                                   : 'Chấp nhận',
                               icon: Icons.check_rounded,
-                              onTap: _planCopyRequestVM.isSubmitting(request.id)
+                              onTap:
+                                  _planCopyRequestVM.isSubmitting(
+                                    planCopyRequest.id,
+                                  )
                                   ? null
-                                  : () => _acceptRequest(item, request),
+                                  : () => _acceptPlanCopyRequest(
+                                      item,
+                                      planCopyRequest,
+                                    ),
                               textColor: Colors.white,
                               backgroundColor: AppColors.success,
                               padding: const EdgeInsets.symmetric(
@@ -435,13 +456,13 @@ class _NotificationPageState extends State<NotificationPage> {
     return null;
   }
 
-  Color _requestStatusColor(PlanCopyRequest request) {
+  Color _planCopyRequestStatusColor(PlanCopyRequest request) {
     if (request.isAccepted) return AppColors.success;
     if (request.isRejected) return AppColors.error;
     return AppColors.goldDeep;
   }
 
-  Future<void> _acceptRequest(
+  Future<void> _acceptPlanCopyRequest(
     AppNotification item,
     PlanCopyRequest request,
   ) async {
@@ -465,7 +486,7 @@ class _NotificationPageState extends State<NotificationPage> {
     );
   }
 
-  Future<void> _rejectRequest(
+  Future<void> _rejectPlanCopyRequest(
     AppNotification item,
     PlanCopyRequest request,
   ) async {

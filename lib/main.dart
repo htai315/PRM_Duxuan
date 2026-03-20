@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:du_xuan/core/utils/notification_service.dart';
 import 'package:du_xuan/di.dart';
 import 'package:du_xuan/routes/app_routes.dart';
+import 'package:du_xuan/routes/route_args.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 void main() async {
@@ -28,6 +29,13 @@ class _DuXuanAppState extends State<DuXuanApp> {
   @override
   void initState() {
     super.initState();
+    // Wire navigation callback từ notification → itinerary page
+    widget.notificationService.onNavigateToPlan = (planId) {
+      widget.notificationService.navigatorKey.currentState?.pushNamed(
+        AppRoutes.itinerary,
+        arguments: ItineraryRouteArgs(planId: planId),
+      );
+    };
     WidgetsBinding.instance.addPostFrameCallback((_) {
       widget.notificationService.handlePendingNavigation();
     });
@@ -50,3 +58,4 @@ class _DuXuanAppState extends State<DuXuanApp> {
     );
   }
 }
+

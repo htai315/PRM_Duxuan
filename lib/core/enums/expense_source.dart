@@ -1,6 +1,7 @@
 enum ExpenseSource {
   manual,
-  migrated;
+  migrated,
+  copied;
 
   String get label {
     switch (this) {
@@ -8,6 +9,8 @@ enum ExpenseSource {
         return 'Thủ công';
       case ExpenseSource.migrated:
         return 'Chuyển đổi';
+      case ExpenseSource.copied:
+        return 'Sao chép';
     }
   }
 

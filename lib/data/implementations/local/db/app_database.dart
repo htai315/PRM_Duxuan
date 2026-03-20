@@ -1,4 +1,5 @@
 import 'package:du_xuan/data/implementations/local/password_hasher.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -323,6 +324,7 @@ class AppDatabase {
   }
 
   Future<void> _seedDefaultUsers(Database db) async {
+    if (!kDebugMode) return;
     final now = DateTime.now().toIso8601String();
     final defaultHash = PasswordHasher.sha256Hash('123456');
 
