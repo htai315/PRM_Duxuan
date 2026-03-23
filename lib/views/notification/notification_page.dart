@@ -8,11 +8,13 @@ import 'package:du_xuan/core/utils/app_feedback.dart';
 import 'package:du_xuan/core/utils/notification_service.dart';
 import 'package:du_xuan/core/utils/notification_ui.dart';
 import 'package:du_xuan/domain/entities/app_notification.dart';
+import 'package:du_xuan/domain/entities/plan.dart';
 import 'package:du_xuan/domain/entities/plan_copy_request.dart';
 import 'package:du_xuan/routes/app_routes.dart';
 import 'package:du_xuan/routes/route_args.dart';
 import 'package:du_xuan/viewmodels/notification/notification_viewmodel.dart';
 import 'package:du_xuan/viewmodels/share/plan_copy_request_viewmodel.dart';
+import 'package:du_xuan/views/notification/widgets/plan_copy_accept_sheet.dart';
 import 'package:du_xuan/views/shared/widgets/app_action_chip.dart';
 import 'package:du_xuan/views/shared/widgets/app_badge_chip.dart';
 import 'package:du_xuan/views/shared/widgets/app_circle_icon.dart';
@@ -40,6 +42,7 @@ class NotificationPage extends StatefulWidget {
 class _NotificationPageState extends State<NotificationPage> {
   late final PlanCopyRequestViewModel _planCopyRequestVM =
       buildPlanCopyRequestVM();
+  late final _planRepository = buildPlanRepository();
 
   @override
   void initState() {
@@ -107,7 +110,7 @@ class _NotificationPageState extends State<NotificationPage> {
           ),
           AppActionChip(
             label: 'Đọc tất cả',
-            onTap: widget.viewModel.unreadCount == 0
+            onTap: widget.viewModel.unreadCount == 0 || widget.viewModel.isSubmitting
                 ? null
                 : () => widget.viewModel.markAllAsRead(widget.userId),
             textColor: AppColors.primary,
@@ -115,6 +118,20 @@ class _NotificationPageState extends State<NotificationPage> {
             borderColor: AppColors.primary.withValues(alpha: 0.16),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             fontSize: 11,
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            tooltip: 'Xóa tất cả thông báo',
+            onPressed: widget.viewModel.notifications.isEmpty ||
+                    widget.viewModel.isSubmitting
+                ? null
+                : _deleteAllNotifications,
+            icon: Icon(
+              Icons.delete_sweep_rounded,
+              color: widget.viewModel.notifications.isEmpty
+                  ? AppColors.textLight.withValues(alpha: 0.45)
+                  : AppColors.error,
+            ),
           ),
           if (kDebugMode) ...[
             const SizedBox(width: 2),
@@ -182,178 +199,192 @@ class _NotificationPageState extends State<NotificationPage> {
         ? AppColors.primary.withValues(alpha: 0.2)
         : AppColors.divider.withValues(alpha: 0.75);
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: _canOpenNotification(item, planCopyRequest)
-            ? () => _openNotification(item, planCopyRequest)
-            : null,
-        borderRadius: BorderRadius.circular(18),
-        child: Ink(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: borderColor),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: NotificationUi.typeColor(
-                    item.type,
-                  ).withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(11),
+    return Dismissible(
+      key: ValueKey(item.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 24),
+        decoration: BoxDecoration(
+          color: AppColors.error.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: const Icon(Icons.delete_rounded, color: AppColors.error),
+      ),
+      confirmDismiss: (_) => _confirmDeleteNotification(item, planCopyRequest),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _canOpenNotification(item, planCopyRequest)
+              ? () => _openNotification(item, planCopyRequest)
+              : null,
+          borderRadius: BorderRadius.circular(18),
+          child: Ink(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            decoration: BoxDecoration(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: borderColor),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: NotificationUi.typeColor(
+                      item.type,
+                    ).withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Icon(
+                    NotificationUi.typeIcon(item.type),
+                    size: 19,
+                    color: NotificationUi.typeColor(item.type),
+                  ),
                 ),
-                child: Icon(
-                  NotificationUi.typeIcon(item.type),
-                  size: 19,
-                  color: NotificationUi.typeColor(item.type),
-                ),
-              ),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item.title,
-                            style: AppTextStyles.bodyMedium.copyWith(
-                              color: AppColors.textDark,
-                              fontWeight: isUnread
-                                  ? FontWeight.w800
-                                  : FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        if (isUnread)
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      item.body,
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: AppColors.textMedium,
-                        height: 1.35,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        AppBadgeChip(
-                          label: item.type.label,
-                          textColor: NotificationUi.typeColor(item.type),
-                          backgroundColor: NotificationUi.typeColor(
-                            item.type,
-                          ).withValues(alpha: 0.12),
-                        ),
-                        Text(
-                          NotificationUi.formatWhen(item),
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textLight,
-                            fontSize: 11,
-                          ),
-                        ),
-                        if (planCopyRequest != null)
-                          AppBadgeChip(
-                            label: planCopyRequest.status.label,
-                            textColor: _planCopyRequestStatusColor(
-                              planCopyRequest,
-                            ),
-                            backgroundColor: _planCopyRequestStatusColor(
-                              planCopyRequest,
-                            ).withValues(alpha: 0.12),
-                            borderColor: _planCopyRequestStatusColor(
-                              planCopyRequest,
-                            ).withValues(alpha: 0.18),
-                          ),
-                      ],
-                    ),
-                    if (planCopyRequest != null &&
-                        planCopyRequest.isPending) ...[
-                      const SizedBox(height: 10),
+                const SizedBox(width: 11),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Row(
                         children: [
                           Expanded(
-                            child: AppActionChip(
-                              label:
-                                  _planCopyRequestVM.isSubmitting(
-                                    planCopyRequest.id,
-                                  )
-                                  ? 'Đang xử lý...'
-                                  : 'Từ chối',
-                              icon: Icons.close_rounded,
-                              onTap:
-                                  _planCopyRequestVM.isSubmitting(
-                                    planCopyRequest.id,
-                                  )
-                                  ? null
-                                  : () => _rejectPlanCopyRequest(
-                                      item,
-                                      planCopyRequest,
-                                    ),
-                              textColor: AppColors.textMedium,
-                              backgroundColor: AppColors.white,
-                              borderColor: AppColors.divider.withValues(
-                                alpha: 0.9,
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 10,
+                            child: Text(
+                              item.title,
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: AppColors.textDark,
+                                fontWeight: isUnread
+                                    ? FontWeight.w800
+                                    : FontWeight.w700,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: AppActionChip(
-                              label:
-                                  _planCopyRequestVM.isSubmitting(
-                                    planCopyRequest.id,
-                                  )
-                                  ? 'Đang xử lý...'
-                                  : 'Chấp nhận',
-                              icon: Icons.check_rounded,
-                              onTap:
-                                  _planCopyRequestVM.isSubmitting(
-                                    planCopyRequest.id,
-                                  )
-                                  ? null
-                                  : () => _acceptPlanCopyRequest(
-                                      item,
-                                      planCopyRequest,
-                                    ),
-                              textColor: Colors.white,
-                              backgroundColor: AppColors.success,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 10,
+                          if (isUnread)
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: AppColors.primary,
+                                shape: BoxShape.circle,
                               ),
                             ),
-                          ),
                         ],
                       ),
+                      const SizedBox(height: 4),
+                      Text(
+                        item.body,
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textMedium,
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          AppBadgeChip(
+                            label: item.type.label,
+                            textColor: NotificationUi.typeColor(item.type),
+                            backgroundColor: NotificationUi.typeColor(
+                              item.type,
+                            ).withValues(alpha: 0.12),
+                          ),
+                          Text(
+                            NotificationUi.formatWhen(item),
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.textLight,
+                              fontSize: 11,
+                            ),
+                          ),
+                          if (planCopyRequest != null)
+                            AppBadgeChip(
+                              label: planCopyRequest.status.label,
+                              textColor: _planCopyRequestStatusColor(
+                                planCopyRequest,
+                              ),
+                              backgroundColor: _planCopyRequestStatusColor(
+                                planCopyRequest,
+                              ).withValues(alpha: 0.12),
+                              borderColor: _planCopyRequestStatusColor(
+                                planCopyRequest,
+                              ).withValues(alpha: 0.18),
+                            ),
+                        ],
+                      ),
+                      if (planCopyRequest != null &&
+                          planCopyRequest.isPending) ...[
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: AppActionChip(
+                                label:
+                                    _planCopyRequestVM.isSubmitting(
+                                      planCopyRequest.id,
+                                    )
+                                    ? 'Đang xử lý...'
+                                    : 'Từ chối',
+                                icon: Icons.close_rounded,
+                                onTap:
+                                    _planCopyRequestVM.isSubmitting(
+                                      planCopyRequest.id,
+                                    )
+                                    ? null
+                                    : () => _rejectPlanCopyRequest(
+                                        item,
+                                        planCopyRequest,
+                                      ),
+                                textColor: AppColors.textMedium,
+                                backgroundColor: AppColors.white,
+                                borderColor: AppColors.divider.withValues(
+                                  alpha: 0.9,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: AppActionChip(
+                                label:
+                                    _planCopyRequestVM.isSubmitting(
+                                      planCopyRequest.id,
+                                    )
+                                    ? 'Đang xử lý...'
+                                    : 'Chấp nhận',
+                                icon: Icons.check_rounded,
+                                onTap:
+                                    _planCopyRequestVM.isSubmitting(
+                                      planCopyRequest.id,
+                                    )
+                                    ? null
+                                    : () => _acceptPlanCopyRequest(
+                                        item,
+                                        planCopyRequest,
+                                      ),
+                                textColor: Colors.white,
+                                backgroundColor: AppColors.success,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -466,9 +497,27 @@ class _NotificationPageState extends State<NotificationPage> {
     AppNotification item,
     PlanCopyRequest request,
   ) async {
+    final template = await _loadTemplatePlan(request.sourcePlanId);
+    if (!mounted) return;
+    if (template == null) {
+      AppFeedback.showErrorSnack(
+        context,
+        'Mẫu kế hoạch hiện không còn khả dụng để sao chép.',
+      );
+      return;
+    }
+
+    final acceptResult = await PlanCopyAcceptSheet.show(
+      context,
+      planName: template.name,
+      dayCount: template.totalDays,
+    );
+    if (!mounted || acceptResult == null) return;
+
     final newPlanId = await _planCopyRequestVM.acceptRequest(
       requestId: request.id,
       targetUserId: widget.userId,
+      newStartDate: acceptResult.startDate,
     );
     if (!mounted || newPlanId == null) {
       final message = _planCopyRequestVM.errorMessage;
@@ -482,7 +531,7 @@ class _NotificationPageState extends State<NotificationPage> {
     if (!mounted) return;
     AppFeedback.showSuccessSnack(
       context,
-      'Đã thêm kế hoạch vào tài khoản của bạn',
+      'Đã thêm mẫu kế hoạch vào tài khoản của bạn',
     );
   }
 
@@ -507,8 +556,90 @@ class _NotificationPageState extends State<NotificationPage> {
     if (!mounted) return;
     AppFeedback.showSnack(
       context,
-      message: 'Bạn đã từ chối lời mời nhận kế hoạch',
+      message: 'Bạn đã từ chối lời mời nhận mẫu kế hoạch',
       type: AppFeedbackType.info,
     );
+  }
+
+  Future<Plan?> _loadTemplatePlan(int planId) {
+    return _planRepository.getById(planId);
+  }
+
+  Future<bool> _confirmDeleteNotification(
+    AppNotification item,
+    PlanCopyRequest? request,
+  ) async {
+    final isImportant = request?.isPending == true;
+
+    final confirmed = await AppFeedback.showConfirmDialog(
+      context: context,
+      title: isImportant ? 'Xóa thông báo quan trọng?' : 'Xóa thông báo?',
+      message: isImportant
+          ? 'Đây là lời mời nhận mẫu kế hoạch chưa xử lý. Nếu xóa thông báo này, bạn sẽ không còn thấy lời mời trong danh sách thông báo. Bạn vẫn muốn xóa chứ?'
+          : 'Thông báo này sẽ bị xóa khỏi danh sách.',
+      confirmText: 'Xóa',
+      destructive: true,
+    );
+    if (!confirmed) return false;
+
+    final success = await widget.viewModel.deleteNotification(item);
+    if (!mounted) return false;
+
+    if (success) {
+      AppFeedback.showSuccessSnack(context, 'Đã xóa thông báo');
+      return true;
+    }
+
+    AppFeedback.showErrorSnack(
+      context,
+      widget.viewModel.errorMessage ?? 'Không thể xóa thông báo',
+    );
+    return false;
+  }
+
+  Future<void> _deleteAllNotifications() async {
+    final importantCount = _countImportantPlanCopyNotifications();
+    final hasImportantNotifications = importantCount > 0;
+
+    final confirmed = await AppFeedback.showConfirmDialog(
+      context: context,
+      title: hasImportantNotifications
+          ? 'Có thông báo quan trọng'
+          : 'Xóa tất cả thông báo?',
+      message: hasImportantNotifications
+          ? 'Bạn đang có $importantCount lời mời nhận mẫu kế hoạch chưa xử lý. Nếu xóa tất cả, các lời mời này cũng sẽ biến mất khỏi danh sách thông báo. Bạn vẫn muốn xóa chứ?'
+          : 'Tất cả thông báo đang hiển thị sẽ bị xóa khỏi danh sách.',
+      confirmText: hasImportantNotifications ? 'Vẫn xóa' : 'Xóa tất cả',
+      cancelText: 'Hủy',
+      destructive: true,
+    );
+    if (!confirmed) return;
+
+    final success = await widget.viewModel.deleteAllVisible(widget.userId);
+    if (!mounted) return;
+
+    if (success) {
+      AppFeedback.showSuccessSnack(context, 'Đã xóa tất cả thông báo');
+      return;
+    }
+
+    AppFeedback.showErrorSnack(
+      context,
+      widget.viewModel.errorMessage ?? 'Không thể xóa tất cả thông báo',
+    );
+  }
+
+  int _countImportantPlanCopyNotifications() {
+    var count = 0;
+    for (final item in widget.viewModel.notifications) {
+      final requestId = _extractPlanCopyRequestId(item.payload);
+      if (requestId == null) continue;
+
+      final request = _planCopyRequestVM.requestFor(requestId);
+      if (request == null || request.isPending) {
+        count++;
+      }
+    }
+    return count;
   }
 }

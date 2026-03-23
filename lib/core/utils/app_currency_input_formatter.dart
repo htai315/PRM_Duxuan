@@ -6,7 +6,7 @@ class AppCurrencyInputFormatter extends TextInputFormatter {
 
   static String formatStoredAmount(num? value) {
     if (value == null || value <= 0) return '';
-    return '${_formatter.format(value.round())} đ';
+    return _formatter.format(value.round());
   }
 
   static String stripFormatting(String rawValue) {
@@ -37,11 +37,38 @@ class AppCurrencyInputFormatter extends TextInputFormatter {
       );
     }
 
-    final formatted = '${_formatter.format(int.parse(digits))} đ';
+    final formatted = _formatter.format(int.parse(digits));
+    final digitsBeforeCursor = _countDigitsBeforeCursor(newValue);
+    final selectionOffset = _findCursorOffset(formatted, digitsBeforeCursor);
+
     return TextEditingValue(
       text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
+      selection: TextSelection.collapsed(offset: selectionOffset),
       composing: TextRange.empty,
     );
+  }
+
+  int _countDigitsBeforeCursor(TextEditingValue value) {
+    final cursor = value.selection.extentOffset.clamp(0, value.text.length);
+    final prefix = value.text.substring(0, cursor);
+    return prefix.replaceAll(RegExp(r'[^0-9]'), '').length;
+  }
+
+  int _findCursorOffset(String formatted, int digitsBeforeCursor) {
+    if (digitsBeforeCursor <= 0) {
+      return 0;
+    }
+
+    var digitCount = 0;
+    for (var i = 0; i < formatted.length; i++) {
+      if (RegExp(r'\d').hasMatch(formatted[i])) {
+        digitCount++;
+        if (digitCount == digitsBeforeCursor) {
+          return i + 1;
+        }
+      }
+    }
+
+    return formatted.length;
   }
 }

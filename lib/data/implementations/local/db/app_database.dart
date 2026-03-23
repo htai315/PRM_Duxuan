@@ -329,8 +329,8 @@ class AppDatabase {
     final defaultHash = PasswordHasher.sha256Hash('123456');
 
     await db.insert('users', {
-      'user_name': 'admin',
-      'full_name': 'Quản trị viên',
+      'user_name': 'nhanle',
+      'full_name': 'Nguyễn Thị Nhàn',
       'password_hash': defaultHash,
       'created_at': now,
     });

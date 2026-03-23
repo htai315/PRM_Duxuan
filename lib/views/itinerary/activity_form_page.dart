@@ -3,6 +3,7 @@ import 'package:du_xuan/core/constants/app_colors.dart';
 import 'package:du_xuan/core/constants/app_text_styles.dart';
 import 'package:du_xuan/core/enums/activity_type.dart';
 import 'package:du_xuan/core/utils/app_currency_input_formatter.dart';
+import 'package:du_xuan/core/utils/app_feedback.dart';
 import 'package:du_xuan/core/utils/app_form_validators.dart';
 import 'package:du_xuan/domain/entities/activity.dart';
 import 'package:du_xuan/viewmodels/itinerary/activity_form_viewmodel.dart';
@@ -44,6 +45,14 @@ class _ActivityFormPageState extends State<ActivityFormPage> {
   // Track scroll for header shadow
   final ScrollController _scrollController = ScrollController();
   bool _isScrolled = false;
+  bool _allowPop = false;
+  String _initialTitle = '';
+  String _initialLocation = '';
+  String _initialCost = '';
+  String _initialNote = '';
+  ActivityType _initialType = ActivityType.travel;
+  TimeOfDay? _initialStartTime;
+  TimeOfDay? _initialEndTime;
 
   @override
   void initState() {
@@ -69,6 +78,7 @@ class _ActivityFormPageState extends State<ActivityFormPage> {
       _startTime = _parseTime(existing.startTime);
       _endTime = _parseTime(existing.endTime);
     }
+    _captureInitialState();
   }
 
   TimeOfDay? _parseTime(String? time) {
@@ -100,40 +110,47 @@ class _ActivityFormPageState extends State<ActivityFormPage> {
   Widget build(BuildContext context) {
     final isEdit = widget.existingActivity != null;
 
-    return Scaffold(
-      extendBody: true,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [AppColors.bgWarm, AppColors.bgCream],
+    return PopScope(
+      canPop: !_shouldGuardExit,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _attemptClose();
+      },
+      child: Scaffold(
+        extendBody: true,
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [AppColors.bgWarm, AppColors.bgCream],
+            ),
           ),
-        ),
-        child: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              ActivityFormAppBar(
-                title: isEdit ? 'Sửa hoạt động' : 'Thêm hoạt động',
-                isScrolled: _isScrolled,
-                onBack: () => Navigator.pop(context),
-              ),
-              Expanded(
-                child: ListenableBuilder(
-                  listenable: widget.viewModel,
-                  builder: (context, child) => _buildForm(),
+          child: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                ActivityFormAppBar(
+                  title: isEdit ? 'Sửa hoạt động' : 'Thêm hoạt động',
+                  isScrolled: _isScrolled,
+                  onBack: _attemptClose,
                 ),
-              ),
-            ],
+                Expanded(
+                  child: ListenableBuilder(
+                    listenable: widget.viewModel,
+                    builder: (context, child) => _buildForm(),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-      bottomNavigationBar: ActivityFormBottomAction(
-        isDisabled: _isSaveDisabled,
-        isLoading: widget.viewModel.isLoading,
-        isEdit: isEdit,
-        onSave: _isSaveDisabled ? null : _handleSave,
+        bottomNavigationBar: ActivityFormBottomAction(
+          isDisabled: _isSaveDisabled,
+          isLoading: widget.viewModel.isLoading,
+          isEdit: isEdit,
+          onSave: _isSaveDisabled ? null : _handleSave,
+        ),
       ),
     );
   }
@@ -275,6 +292,7 @@ class _ActivityFormPageState extends State<ActivityFormPage> {
                 iconColor: AppColors.goldDeep,
                 keyboardType: TextInputType.number,
                 inputFormatters: [AppCurrencyInputFormatter()],
+                suffixText: 'đ',
                 isBorderless: true,
                 onChanged: (value) {
                   widget.viewModel.clearError();
@@ -378,6 +396,51 @@ class _ActivityFormPageState extends State<ActivityFormPage> {
     setState(() {});
   }
 
+  void _captureInitialState() {
+    _initialTitle = _titleCtrl.text.trim();
+    _initialLocation = _locationCtrl.text.trim();
+    _initialCost = _costCtrl.text.trim();
+    _initialNote = _noteCtrl.text.trim();
+    _initialType = _selectedType;
+    _initialStartTime = _startTime;
+    _initialEndTime = _endTime;
+  }
+
+  bool get _hasUnsavedChanges {
+    return _titleCtrl.text.trim() != _initialTitle ||
+        _locationCtrl.text.trim() != _initialLocation ||
+        _costCtrl.text.trim() != _initialCost ||
+        _noteCtrl.text.trim() != _initialNote ||
+        _selectedType != _initialType ||
+        _startTime != _initialStartTime ||
+        _endTime != _initialEndTime;
+  }
+
+  bool get _shouldGuardExit =>
+      !_allowPop && !widget.viewModel.isLoading && _hasUnsavedChanges;
+
+  Future<void> _attemptClose() async {
+    if (_allowPop) {
+      if (mounted) Navigator.pop(context);
+      return;
+    }
+    if (widget.viewModel.isLoading) {
+      return;
+    }
+    if (!_hasUnsavedChanges) {
+      if (mounted) Navigator.pop(context);
+      return;
+    }
+
+    final discard = await AppFeedback.showDiscardChangesDialog(
+      context: context,
+      message: 'Nếu thoát bây giờ, hoạt động bạn đang nhập sẽ bị mất.',
+    );
+    if (!discard || !mounted) return;
+    setState(() => _allowPop = true);
+    Navigator.pop(context);
+  }
+
   Widget _timePicker(
     String label,
     TimeOfDay? value,
@@ -448,6 +511,7 @@ class _ActivityFormPageState extends State<ActivityFormPage> {
       estimatedCostText: _costCtrl.text,
     );
     if (result != null && mounted) {
+      setState(() => _allowPop = true);
       Navigator.pop(context, true);
     }
   }

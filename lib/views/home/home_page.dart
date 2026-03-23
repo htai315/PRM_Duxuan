@@ -82,16 +82,28 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _openPlanDetail(int planId) async {
-    await Navigator.pushNamed(
+  Future<void> _openPlanDetail(int planId, {String? successMessage}) async {
+    final result = await Navigator.pushNamed(
       context,
       AppRoutes.itinerary,
-      arguments: ItineraryRouteArgs(planId: planId),
+      arguments: ItineraryRouteArgs(
+        planId: planId,
+        successMessage: successMessage,
+      ),
     );
     if (!mounted) return;
 
     // Plan detail hiện chưa trả về dirty flag chính xác cho mọi nhánh mutate.
     await _handlePlanMutation();
+    if (!mounted) return;
+
+    if (result is Map && result['deleted'] == true) {
+      final message = result['message'];
+      AppFeedback.showSuccessSnack(
+        context,
+        message is String ? message : 'Đã xóa kế hoạch',
+      );
+    }
   }
 
   void _onTabChanged(int index) {
@@ -261,7 +273,10 @@ class _HomePageState extends State<HomePage> {
     if (!mounted) return;
 
     if (result is int && result > 0) {
-      await _openPlanDetail(result);
+      await _openPlanDetail(
+        result,
+        successMessage: 'Tạo kế hoạch thành công',
+      );
       return;
     }
 

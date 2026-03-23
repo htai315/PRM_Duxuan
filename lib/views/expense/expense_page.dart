@@ -210,7 +210,7 @@ class _ExpensePageState extends State<ExpensePage> {
     }
   }
 
-  Future<void> _deleteExpense(Expense expense) async {
+  Future<bool> _deleteExpense(Expense expense) async {
     if (!_canEditExpenses) {
       if (mounted) {
         AppFeedback.showInfoSnack(
@@ -218,7 +218,7 @@ class _ExpensePageState extends State<ExpensePage> {
           'Kế hoạch lưu trữ chỉ có thể xem lại chi tiêu.',
         );
       }
-      return;
+      return false;
     }
 
     final confirmed = await AppFeedback.showConfirmDialog(
@@ -229,17 +229,19 @@ class _ExpensePageState extends State<ExpensePage> {
       destructive: true,
     );
 
-    if (!confirmed) return;
+    if (!confirmed) return false;
 
     final success = await widget.expenseViewModel.deleteExpense(expense.id);
-    if (!mounted) return;
+    if (!mounted) return false;
     if (success) {
       AppFeedback.showSuccessSnack(context, 'Đã xóa khoản chi');
+      return true;
     } else {
       AppFeedback.showErrorSnack(
         context,
         widget.expenseViewModel.errorMessage ?? 'Không thể xóa khoản chi',
       );
+      return false;
     }
   }
 
@@ -595,130 +597,118 @@ class _ExpensePageState extends State<ExpensePage> {
   Widget _buildExpenseItem(Expense expense) {
     final category = expense.category;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      decoration: BoxDecoration(
-        color: AppColors.bgCream.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.divider.withValues(alpha: 0.7)),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+    return Dismissible(
+      key: ValueKey(expense.id),
+      direction: _canEditExpenses
+          ? DismissDirection.endToStart
+          : DismissDirection.none,
+      background: Container(
+        alignment: Alignment.centerRight,
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.only(right: 24),
+        decoration: BoxDecoration(
+          color: AppColors.error.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(14),
-          onTap: _canEditExpenses ? () => _openEditExpense(expense) : null,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(
-              children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: category.color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(category.icon, size: 16, color: category.color),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        expense.title,
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: [
-                          AppBadgeChip(
-                            label: category.label,
-                            textColor: category.color,
-                            backgroundColor: category.color.withValues(
-                              alpha: 0.12,
-                            ),
-                            fontSize: 10,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ],
-                      ),
-                      if (expense.note != null &&
-                          expense.note!.trim().isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          expense.note!,
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textLight,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      ActivityCostUi.formatCurrency(expense.amount),
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.goldDeep,
-                      ),
+        ),
+        child: const Icon(Icons.delete_rounded, color: AppColors.error),
+      ),
+      confirmDismiss: (_) => _deleteExpense(expense),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        decoration: BoxDecoration(
+          color: AppColors.bgCream.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.divider.withValues(alpha: 0.7)),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: _canEditExpenses ? () => _openEditExpense(expense) : null,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: category.color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    const SizedBox(height: 3),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
+                    child: Icon(category.icon, size: 16, color: category.color),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          DateUi.shortDate(expense.spentAt),
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textLight,
+                          expense.title,
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                        if (_canEditExpenses) ...[
-                          const SizedBox(width: 4),
-                          PopupMenuButton<String>(
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            icon: const Icon(
-                              Icons.more_horiz_rounded,
-                              size: 18,
+                        const SizedBox(height: 2),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            AppBadgeChip(
+                              label: category.label,
+                              textColor: category.color,
+                              backgroundColor: category.color.withValues(
+                                alpha: 0.12,
+                              ),
+                              fontSize: 10,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ],
+                        ),
+                        if (expense.note != null &&
+                            expense.note!.trim().isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            expense.note!,
+                            style: AppTextStyles.bodySmall.copyWith(
                               color: AppColors.textLight,
                             ),
-                            onSelected: (value) {
-                              if (value == 'edit') {
-                                _openEditExpense(expense);
-                              } else if (value == 'delete') {
-                                _deleteExpense(expense);
-                              }
-                            },
-                            itemBuilder: (_) => const [
-                              PopupMenuItem<String>(
-                                value: 'edit',
-                                child: Text('Sửa khoản chi'),
-                              ),
-                              PopupMenuItem<String>(
-                                value: 'delete',
-                                child: Text('Xóa khoản chi'),
-                              ),
-                            ],
                           ),
                         ],
                       ],
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        ActivityCostUi.formatCurrency(expense.amount),
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.goldDeep,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            DateUi.shortDate(expense.spentAt),
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.textLight,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),

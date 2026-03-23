@@ -5,9 +5,13 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:du_xuan/core/enums/plan_status.dart';
 import 'package:du_xuan/core/enums/notification_type.dart';
+import 'package:du_xuan/data/interfaces/repositories/i_activity_repository.dart';
 import 'package:du_xuan/data/interfaces/repositories/i_notification_repository.dart';
+import 'package:du_xuan/data/interfaces/repositories/i_plan_repository.dart';
+import 'package:du_xuan/domain/entities/activity.dart';
 import 'package:du_xuan/domain/entities/app_notification.dart';
 import 'package:du_xuan/domain/entities/plan.dart';
+import 'package:du_xuan/domain/entities/plan_day.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -26,6 +30,8 @@ class NotificationService {
 
   final FlutterLocalNotificationsPlugin _plugin;
   final INotificationRepository _notificationRepo;
+  final IPlanRepository _planRepository;
+  final IActivityRepository _activityRepository;
   void Function(int planId)? onNavigateToPlan;
 
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -35,9 +41,13 @@ class NotificationService {
 
   NotificationService({
     required INotificationRepository notificationRepo,
+    required IPlanRepository planRepository,
+    required IActivityRepository activityRepository,
     this.onNavigateToPlan,
     FlutterLocalNotificationsPlugin? plugin,
   }) : _notificationRepo = notificationRepo,
+       _planRepository = planRepository,
+       _activityRepository = activityRepository,
        _plugin = plugin ?? FlutterLocalNotificationsPlugin() {
     instance = this;
   }
@@ -118,50 +128,20 @@ class NotificationService {
       return;
     }
 
-    final reminders = <_ReminderSpec>[
-      const _ReminderSpec(
-        code: 'D_MINUS_1',
-        title: 'Nhắc chuyến đi ngày mai',
-        bodyTemplate: 'Kế hoạch "{name}" sẽ bắt đầu vào ngày mai.',
-        dayOffset: -1,
-        hour: 14,
-        minute: 40,
-      ),
-      const _ReminderSpec(
-        code: 'D0',
-        title: 'Hôm nay khởi hành',
-        bodyTemplate: 'Đến ngày bắt đầu kế hoạch "{name}". Chúc bạn đi vui!',
-        dayOffset: 0,
-        hour: 7,
-      ),
+    final now = DateTime.now();
+    final reminders = <_ReminderRequest>[
+      _buildTomorrowReminder(plan),
+      ...await _buildFirstActivityReminder(plan),
     ];
 
-    final start = DateTime(
-      plan.startDate.year,
-      plan.startDate.month,
-      plan.startDate.day,
-    );
-    final now = DateTime.now();
-
-    for (final spec in reminders) {
-      final triggerDate = start.add(Duration(days: spec.dayOffset));
-      final trigger = DateTime(
-        triggerDate.year,
-        triggerDate.month,
-        triggerDate.day,
-        spec.hour,
-        spec.minute,
-        0,
-      );
-
-      if (!trigger.isAfter(now)) {
+    for (final reminder in reminders) {
+      if (!reminder.trigger.isAfter(now)) {
         continue;
       }
 
-      final eventKey = _eventKey(plan.id, spec.code);
+      final eventKey = _eventKey(plan.id, reminder.code);
       final payloadMap = {'planId': plan.id, 'eventKey': eventKey};
       final payload = jsonEncode(payloadMap);
-      final body = spec.bodyTemplate.replaceAll('{name}', plan.name);
 
       await _notificationRepo.deleteByEventKey(eventKey);
       await _notificationRepo.create(
@@ -169,12 +149,12 @@ class NotificationService {
           id: 0,
           userId: plan.userId,
           planId: plan.id,
-          title: spec.title,
-          body: body,
+          title: reminder.title,
+          body: reminder.body,
           isRead: false,
           type: NotificationType.reminder,
           eventKey: eventKey,
-          scheduledAt: trigger,
+          scheduledAt: reminder.trigger,
           createdAt: now,
           payload: payload,
         ),
@@ -194,10 +174,10 @@ class NotificationService {
       final scheduleMode = await _resolveAndroidScheduleMode();
 
       await _plugin.zonedSchedule(
-        _notificationId(plan.id, spec.code),
-        spec.title,
-        body,
-        tz.TZDateTime.from(trigger, tz.local),
+        _notificationId(plan.id, reminder.code),
+        reminder.title,
+        reminder.body,
+        tz.TZDateTime.from(reminder.trigger, tz.local),
         detail,
         payload: payload,
         uiLocalNotificationDateInterpretation:
@@ -324,8 +304,12 @@ class NotificationService {
   Future<void> cancelPlanReminder(int planId) async {
     if (!_initialized) await initialize();
 
-    await _plugin.cancel(_notificationId(planId, 'D_MINUS_1'));
-    await _plugin.cancel(_notificationId(planId, 'D0'));
+    await _plugin.cancel(
+      _notificationId(planId, _ReminderCode.tomorrowReminder),
+    );
+    await _plugin.cancel(
+      _notificationId(planId, _ReminderCode.firstActivityReminder),
+    );
 
     await _notificationRepo.deleteReminderByPlanId(planId);
   }
@@ -355,7 +339,11 @@ class NotificationService {
   }
 
   int _notificationId(int planId, String code) {
-    final suffix = code == 'D_MINUS_1' ? 1 : 2;
+    final suffix = switch (code) {
+      _ReminderCode.tomorrowReminder => 1,
+      _ReminderCode.firstActivityReminder => 2,
+      _ => 99,
+    };
     return (planId * 10) + suffix;
   }
 
@@ -385,6 +373,99 @@ class NotificationService {
   }
 
   String _eventKey(int planId, String code) => 'plan:$planId:$code';
+
+  _ReminderRequest _buildTomorrowReminder(Plan plan) {
+    final start = DateTime(
+      plan.startDate.year,
+      plan.startDate.month,
+      plan.startDate.day,
+    );
+    final triggerDate = start.subtract(const Duration(days: 1));
+    final trigger = DateTime(
+      triggerDate.year,
+      triggerDate.month,
+      triggerDate.day,
+      22,
+      0,
+      0,
+    );
+    return _ReminderRequest(
+      code: _ReminderCode.tomorrowReminder,
+      title: 'Ngày mai bạn có kế hoạch',
+      body: 'Kế hoạch "${plan.name}" sẽ bắt đầu vào ngày mai.',
+      trigger: trigger,
+    );
+  }
+
+  Future<List<_ReminderRequest>> _buildFirstActivityReminder(Plan plan) async {
+    final firstActivityInfo = await _findFirstActivityOfFirstDay(plan);
+    if (firstActivityInfo == null) return const [];
+
+    final activityStart = _combinePlanDateAndTime(
+      firstActivityInfo.day.date,
+      firstActivityInfo.activity.startTime!,
+    );
+    if (activityStart == null) return const [];
+
+    final trigger = activityStart.subtract(const Duration(hours: 1));
+    final startLabel = firstActivityInfo.activity.startTime!.trim();
+
+    return [
+      _ReminderRequest(
+        code: _ReminderCode.firstActivityReminder,
+        title: 'Sắp đến hoạt động đầu tiên',
+        body:
+            'Còn 1 tiếng nữa là đến "${firstActivityInfo.activity.title}" lúc $startLabel trong kế hoạch "${plan.name}".',
+        trigger: trigger,
+      ),
+    ];
+  }
+
+  Future<_FirstActivityInfo?> _findFirstActivityOfFirstDay(Plan plan) async {
+    final fullPlan = plan.days.isNotEmpty
+        ? plan
+        : await _planRepository.getById(plan.id);
+    if (fullPlan == null || fullPlan.days.isEmpty) return null;
+
+    final sortedDays = [...fullPlan.days]
+      ..sort((a, b) => a.dayNumber.compareTo(b.dayNumber));
+    final firstDay = sortedDays.first;
+    final activities = await _activityRepository.getByPlanDayId(firstDay.id);
+
+    final candidates =
+        activities
+            .where(
+              (activity) => (activity.startTime?.trim().isNotEmpty ?? false),
+            )
+            .toList()
+          ..sort((a, b) {
+            final startCompare = (a.startTime ?? '').compareTo(
+              b.startTime ?? '',
+            );
+            if (startCompare != 0) return startCompare;
+            return a.orderIndex.compareTo(b.orderIndex);
+          });
+
+    if (candidates.isEmpty) return null;
+    return _FirstActivityInfo(day: firstDay, activity: candidates.first);
+  }
+
+  DateTime? _combinePlanDateAndTime(DateTime date, String timeText) {
+    final parsed = _parseHourMinute(timeText);
+    if (parsed == null) return null;
+    return DateTime(date.year, date.month, date.day, parsed.$1, parsed.$2);
+  }
+
+  (int, int)? _parseHourMinute(String raw) {
+    final normalized = raw.trim();
+    final match = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(normalized);
+    if (match == null) return null;
+    final hour = int.tryParse(match.group(1)!);
+    final minute = int.tryParse(match.group(2)!);
+    if (hour == null || minute == null) return null;
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    return (hour, minute);
+  }
 
   void _navigateToPlan(int planId) {
     final callback = onNavigateToPlan;
@@ -431,20 +512,28 @@ class NotificationService {
   }
 }
 
-class _ReminderSpec {
+class _ReminderRequest {
   final String code;
   final String title;
-  final String bodyTemplate;
-  final int dayOffset;
-  final int hour;
-  final int minute;
+  final String body;
+  final DateTime trigger;
 
-  const _ReminderSpec({
+  const _ReminderRequest({
     required this.code,
     required this.title,
-    required this.bodyTemplate,
-    required this.dayOffset,
-    required this.hour,
-    this.minute = 0,
+    required this.body,
+    required this.trigger,
   });
+}
+
+class _FirstActivityInfo {
+  final PlanDay day;
+  final Activity activity;
+
+  const _FirstActivityInfo({required this.day, required this.activity});
+}
+
+abstract final class _ReminderCode {
+  static const tomorrowReminder = 'D_MINUS_1_2200';
+  static const firstActivityReminder = 'FIRST_ACTIVITY_MINUS_1H';
 }

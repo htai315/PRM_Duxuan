@@ -36,6 +36,7 @@ class PlanCopyRequestViewModel extends ChangeNotifier {
   Future<int?> acceptRequest({
     required int requestId,
     required int targetUserId,
+    required DateTime newStartDate,
   }) async {
     if (_submittingIds.contains(requestId)) return null;
 
@@ -47,6 +48,7 @@ class PlanCopyRequestViewModel extends ChangeNotifier {
       final newPlanId = await _repository.acceptCopyRequest(
         requestId: requestId,
         targetUserId: targetUserId,
+        newStartDate: newStartDate,
       );
       final updated = await _repository.getRequestById(requestId);
       if (updated != null) {

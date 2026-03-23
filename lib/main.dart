@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:du_xuan/core/utils/notification_service.dart';
 import 'package:du_xuan/di.dart';
 import 'package:du_xuan/routes/app_routes.dart';
@@ -47,10 +48,14 @@ class _DuXuanAppState extends State<DuXuanApp> {
       title: 'Du Xuân Planner',
       debugShowCheckedModeBanner: false,
       navigatorKey: widget.notificationService.navigatorKey,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('vi'), Locale('en')],
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFD32F2F),
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFD32F2F)),
         useMaterial3: true,
       ),
       initialRoute: AppRoutes.splash,
@@ -58,4 +63,3 @@ class _DuXuanAppState extends State<DuXuanApp> {
     );
   }
 }
-

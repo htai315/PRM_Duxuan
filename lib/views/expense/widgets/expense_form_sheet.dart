@@ -101,11 +101,12 @@ class ExpenseFormSheet extends StatelessWidget {
                 _buildTextField(
                   controller: amountCtrl,
                   label: 'Số tiền (VNĐ)',
-                  hint: 'Ví dụ: 150.000 đ',
+                  hint: 'Ví dụ: 150.000',
                   icon: Icons.account_balance_wallet_rounded,
                   errorText: amountError,
                   keyboardType: TextInputType.number,
                   inputFormatters: [AppCurrencyInputFormatter()],
+                  suffixText: 'đ',
                 ),
                 const SizedBox(height: 12),
                 _buildCategorySelector(),
@@ -162,6 +163,7 @@ class ExpenseFormSheet extends StatelessWidget {
     TextInputType? keyboardType,
     int maxLines = 1,
     List<TextInputFormatter>? inputFormatters,
+    String? suffixText,
   }) {
     return TextField(
       controller: controller,
@@ -179,6 +181,11 @@ class ExpenseFormSheet extends StatelessWidget {
         filled: true,
         fillColor: AppColors.white,
         prefixIcon: Icon(icon, color: AppColors.goldDeep),
+        suffixText: suffixText,
+        suffixStyle: AppTextStyles.bodyMedium.copyWith(
+          color: AppColors.textMedium,
+          fontWeight: FontWeight.w700,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(

@@ -208,6 +208,8 @@ NotificationService? _notificationService;
 NotificationService buildNotificationService() {
   _notificationService ??= NotificationService(
     notificationRepo: _buildNotificationRepository(),
+    planRepository: _buildPlanRepository(),
+    activityRepository: _buildActivityRepository(),
   );
   return _notificationService!;
 }

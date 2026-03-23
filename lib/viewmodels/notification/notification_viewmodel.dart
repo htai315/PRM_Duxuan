@@ -74,6 +74,30 @@ class NotificationViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> deleteNotification(AppNotification notification) async {
+    if (_isSubmitting) return false;
+
+    _isSubmitting = true;
+    notifyListeners();
+
+    try {
+      await _repository.deleteById(notification.id);
+      _notifications.removeWhere((item) => item.id == notification.id);
+      if (!notification.isRead) {
+        _unreadCount = (_unreadCount - 1).clamp(0, 999999).toInt();
+      }
+      _errorMessage = null;
+      _isSubmitting = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      _isSubmitting = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<void> markAllAsRead(int userId) async {
     if (_isSubmitting || _unreadCount == 0) return;
 
@@ -94,5 +118,27 @@ class NotificationViewModel extends ChangeNotifier {
 
     _isSubmitting = false;
     notifyListeners();
+  }
+
+  Future<bool> deleteAllVisible(int userId) async {
+    if (_isSubmitting || _notifications.isEmpty) return false;
+
+    _isSubmitting = true;
+    notifyListeners();
+
+    try {
+      await _repository.deleteAllVisibleByUserId(userId);
+      _notifications = [];
+      _unreadCount = 0;
+      _errorMessage = null;
+      _isSubmitting = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      _isSubmitting = false;
+      notifyListeners();
+      return false;
+    }
   }
 }

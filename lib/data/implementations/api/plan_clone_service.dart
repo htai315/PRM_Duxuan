@@ -13,6 +13,7 @@ class PlanCloneService {
     required int sourceUserId,
     required int targetUserId,
     required String createdAtIso,
+    required DateTime newStartDate,
   }) async {
     final sourcePlan = await _getPlan(txn, sourcePlanId);
     if (sourcePlan == null) {
@@ -30,26 +31,34 @@ class PlanCloneService {
       throw Exception('Không tìm thấy tài khoản nhận kế hoạch.');
     }
 
+    final templateDayCount = await _resolveTemplateDayCount(txn, sourcePlan);
+    final normalizedStartDate = _dateOnly(newStartDate);
+    final normalizedEndDate = normalizedStartDate.add(
+      Duration(days: templateDayCount - 1),
+    );
+
     final newPlanId = await txn.insert('plans', {
       'user_id': targetUserId,
       'name': (sourcePlan['name'] ?? '').toString(),
       'description': _nullableString(sourcePlan['description']),
-      'start_date': (sourcePlan['start_date'] ?? '').toString(),
-      'end_date': (sourcePlan['end_date'] ?? '').toString(),
+      'start_date': _dateToIso(normalizedStartDate),
+      'end_date': _dateToIso(normalizedEndDate),
       'participants': _nullableString(sourcePlan['participants']),
       'cover_image': _nullableString(sourcePlan['cover_image']),
       'note': _nullableString(sourcePlan['note']),
-      'status': _clonedPlanStatus((sourcePlan['status'] ?? '').toString()),
+      'status': 'DRAFT',
       'created_at': createdAtIso,
       'updated_at': createdAtIso,
     });
 
-    final dayIdMap = await _copyPlanDays(txn, sourcePlanId, newPlanId);
+    final dayIdMap = await _copyPlanDays(
+      txn,
+      sourcePlanId,
+      newPlanId,
+      normalizedStartDate,
+    );
     final activityIdMap = await _copyActivities(txn, sourcePlanId, dayIdMap);
     await _copyChecklistItems(txn, sourcePlanId, newPlanId, activityIdMap);
-    await _copyExpenses(
-      txn, sourcePlanId, newPlanId, dayIdMap, activityIdMap, createdAtIso,
-    );
     await _createCopySourceRecord(
       txn: txn,
       sourcePlanId: sourcePlanId,
@@ -65,7 +74,10 @@ class PlanCloneService {
   // ─── Copy helpers ────────────────────────────────────
 
   static Future<Map<int, int>> _copyPlanDays(
-    DatabaseExecutor db, int sourcePlanId, int newPlanId,
+    DatabaseExecutor db,
+    int sourcePlanId,
+    int newPlanId,
+    DateTime newStartDate,
   ) async {
     final rows = await db.query(
       'plan_days',
@@ -78,10 +90,16 @@ class PlanCloneService {
     for (final row in rows) {
       final oldDayId = row['id'] as int?;
       if (oldDayId == null) continue;
+      final dayNumber = row['day_number'] as int? ?? 0;
+      final normalizedDayNumber = dayNumber <= 0
+          ? dayIdMap.length + 1
+          : dayNumber;
       final newDayId = await db.insert('plan_days', {
         'plan_id': newPlanId,
-        'date': (row['date'] ?? '').toString(),
-        'day_number': row['day_number'] as int? ?? 0,
+        'date': _dateToIso(
+          newStartDate.add(Duration(days: normalizedDayNumber - 1)),
+        ),
+        'day_number': normalizedDayNumber,
       });
       dayIdMap[oldDayId] = newDayId;
     }
@@ -89,15 +107,20 @@ class PlanCloneService {
   }
 
   static Future<Map<int, int>> _copyActivities(
-    DatabaseExecutor db, int sourcePlanId, Map<int, int> dayIdMap,
+    DatabaseExecutor db,
+    int sourcePlanId,
+    Map<int, int> dayIdMap,
   ) async {
-    final rows = await db.rawQuery('''
+    final rows = await db.rawQuery(
+      '''
       SELECT a.*
       FROM activities a
       INNER JOIN plan_days pd ON pd.id = a.plan_day_id
       WHERE pd.plan_id = ?
       ORDER BY pd.day_number ASC, a.order_index ASC, COALESCE(a.start_time, '') ASC, a.id ASC
-      ''', [sourcePlanId]);
+      ''',
+      [sourcePlanId],
+    );
 
     final activityIdMap = <int, int>{};
     for (final row in rows) {
@@ -122,7 +145,7 @@ class PlanCloneService {
         'estimated_cost': _nullableDouble(row['estimated_cost']),
         'priority': row['priority'] as int? ?? 0,
         'order_index': row['order_index'] as int? ?? 0,
-        'status': (row['status'] ?? 'TODO').toString(),
+        'status': 'TODO',
       });
       activityIdMap[oldActivityId] = newActivityId;
     }
@@ -161,42 +184,6 @@ class PlanCloneService {
     }
   }
 
-  static Future<void> _copyExpenses(
-    DatabaseExecutor db,
-    int sourcePlanId,
-    int newPlanId,
-    Map<int, int> dayIdMap,
-    Map<int, int> activityIdMap,
-    String nowIso,
-  ) async {
-    final rows = await db.query(
-      'expenses',
-      where: 'plan_id = ?',
-      whereArgs: [sourcePlanId],
-      orderBy: 'spent_at ASC, id ASC',
-    );
-
-    for (final row in rows) {
-      final oldPlanDayId = row['plan_day_id'] as int?;
-      final oldActivityId = row['activity_id'] as int?;
-      await db.insert('expenses', {
-        'plan_id': newPlanId,
-        'plan_day_id': oldPlanDayId == null ? null : dayIdMap[oldPlanDayId],
-        'activity_id': oldActivityId == null
-            ? null
-            : activityIdMap[oldActivityId],
-        'title': (row['title'] ?? '').toString(),
-        'amount': _nullableDouble(row['amount']) ?? 0,
-        'category': (row['category'] ?? 'OTHER').toString(),
-        'note': _nullableString(row['note']),
-        'spent_at': (row['spent_at'] ?? nowIso).toString(),
-        'created_at': nowIso,
-        'updated_at': nowIso,
-        'source': 'COPIED',
-      });
-    }
-  }
-
   static Future<void> _createCopySourceRecord({
     required DatabaseExecutor txn,
     required int sourcePlanId,
@@ -217,25 +204,75 @@ class PlanCloneService {
   // ─── Shared utils ────────────────────────────────────
 
   static Future<Map<String, dynamic>?> _getPlan(
-    DatabaseExecutor db, int planId,
+    DatabaseExecutor db,
+    int planId,
   ) async {
-    final rows = await db.query('plans', where: 'id = ?', whereArgs: [planId], limit: 1);
+    final rows = await db.query(
+      'plans',
+      where: 'id = ?',
+      whereArgs: [planId],
+      limit: 1,
+    );
     if (rows.isEmpty) return null;
     return rows.first;
   }
 
   static Future<Map<String, dynamic>?> _getUser(
-    DatabaseExecutor db, int userId,
+    DatabaseExecutor db,
+    int userId,
   ) async {
-    final rows = await db.query('users', where: 'id = ?', whereArgs: [userId], limit: 1);
+    final rows = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [userId],
+      limit: 1,
+    );
     if (rows.isEmpty) return null;
     return rows.first;
   }
 
-  static String _clonedPlanStatus(String rawStatus) {
-    final normalized = rawStatus.trim().toUpperCase();
-    if (normalized == 'ARCHIVED') return 'ACTIVE';
-    return normalized.isEmpty ? 'ACTIVE' : normalized;
+  static Future<int> _resolveTemplateDayCount(
+    DatabaseExecutor db,
+    Map<String, dynamic> sourcePlan,
+  ) async {
+    final parsedCount = _tryParseDayCount(
+      sourcePlan['start_date']?.toString(),
+      sourcePlan['end_date']?.toString(),
+    );
+    if (parsedCount != null && parsedCount > 0) {
+      return parsedCount;
+    }
+
+    final sourcePlanId = sourcePlan['id'] as int?;
+    if (sourcePlanId != null) {
+      final countRows = await db.rawQuery(
+        'SELECT COUNT(*) AS count FROM plan_days WHERE plan_id = ?',
+        [sourcePlanId],
+      );
+      final count = countRows.first['count'] as int? ?? 0;
+      if (count > 0) return count;
+    }
+
+    return 1;
+  }
+
+  static int? _tryParseDayCount(String? startIso, String? endIso) {
+    if (startIso == null || endIso == null) return null;
+    final start = DateTime.tryParse(startIso);
+    final end = DateTime.tryParse(endIso);
+    if (start == null || end == null) return null;
+    final normalizedStart = _dateOnly(start);
+    final normalizedEnd = _dateOnly(end);
+    final diff = normalizedEnd.difference(normalizedStart).inDays + 1;
+    return diff > 0 ? diff : null;
+  }
+
+  static DateTime _dateOnly(DateTime input) {
+    return DateTime(input.year, input.month, input.day);
+  }
+
+  static String _dateToIso(DateTime value) {
+    return _dateOnly(value).toIso8601String();
   }
 
   static String? _nullableString(Object? value) {

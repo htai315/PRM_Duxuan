@@ -31,11 +31,13 @@ import 'package:du_xuan/di.dart';
 class PlanDetailPage extends StatefulWidget {
   final ItineraryViewModel viewModel;
   final int planId;
+  final String? successMessage;
 
   const PlanDetailPage({
     super.key,
     required this.viewModel,
     required this.planId,
+    this.successMessage,
   });
 
   @override
@@ -63,6 +65,16 @@ class _PlanDetailPageState extends State<PlanDetailPage>
     _expenseVM.loadExpenses(widget.planId);
     _publicShareVM.loadLink(widget.planId);
     _planCopySourceVM.loadSource(widget.planId);
+    if (widget.successMessage != null && widget.successMessage!.trim().isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        AppFeedback.showSuccessSnack(
+          context,
+          widget.successMessage!,
+          duration: const Duration(seconds: 3),
+        );
+      });
+    }
   }
 
   @override
@@ -257,6 +269,20 @@ class _PlanDetailPageState extends State<PlanDetailPage>
                   ),
                 ),
               const PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.delete_outline_rounded,
+                      size: 18,
+                      color: AppColors.error,
+                    ),
+                    SizedBox(width: 10),
+                    Text('Xóa kế hoạch'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
                 value: 'share_text',
                 child: Row(
                   children: [
@@ -280,7 +306,7 @@ class _PlanDetailPageState extends State<PlanDetailPage>
                       color: AppColors.textMedium,
                     ),
                     SizedBox(width: 10),
-                    Text('Gửi lời mời nhận kế hoạch'),
+                    Text('Gửi lời mời nhận template'),
                   ],
                 ),
               ),
@@ -475,6 +501,9 @@ class _PlanDetailPageState extends State<PlanDetailPage>
           );
         }
         break;
+      case 'delete':
+        await _deletePlan();
+        break;
       case 'share_text':
         final text = await PlanShareBuilder.build(widget.planId);
         final subject = widget.viewModel.plan?.name.trim().isNotEmpty == true
@@ -503,6 +532,42 @@ class _PlanDetailPageState extends State<PlanDetailPage>
     }
   }
 
+  Future<void> _deletePlan() async {
+    final plan = widget.viewModel.plan;
+    if (plan == null) {
+      AppFeedback.showWarningSnack(
+        context,
+        'Kế hoạch hiện tại không còn khả dụng để xóa.',
+      );
+      return;
+    }
+
+    final confirmed = await AppFeedback.showConfirmDialog(
+      context: context,
+      title: 'Xóa kế hoạch?',
+      message: 'Bạn muốn xóa "${plan.name}"?\nTất cả dữ liệu sẽ bị mất.',
+      confirmText: 'Xóa',
+      destructive: true,
+    );
+    if (!confirmed) return;
+
+    final deleted = await widget.viewModel.deletePlan();
+    if (!mounted) return;
+
+    if (deleted) {
+      Navigator.pop(context, {
+        'deleted': true,
+        'message': 'Đã xóa kế hoạch "${plan.name}"',
+      });
+      return;
+    }
+
+    AppFeedback.showErrorSnack(
+      context,
+      widget.viewModel.errorMessage ?? 'Xóa kế hoạch thất bại',
+    );
+  }
+
   Future<void> _openPlanCopyShareSheet() async {
     final plan = widget.viewModel.plan;
     if (plan == null) {
@@ -527,7 +592,7 @@ class _PlanDetailPageState extends State<PlanDetailPage>
 
     AppFeedback.showSuccessSnack(
       context,
-      'Đã gửi lời mời nhận kế hoạch cho ${result.recipient.fullName}',
+      'Đã gửi lời mời nhận template cho ${result.recipient.fullName}',
       duration: const Duration(seconds: 3),
     );
   }

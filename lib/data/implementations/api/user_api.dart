@@ -31,4 +31,34 @@ class UserApi implements IUserApi {
     );
     return rows.map(UserDto.fromMap).toList();
   }
+
+  @override
+  Future<List<UserDto>> search(
+    String query, {
+    int? excludeUserId,
+    int limit = 20,
+  }) async {
+    final normalized = query.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      return const [];
+    }
+
+    final db = await _database.db;
+    final pattern = '%$normalized%';
+    final hasExcludeUser = excludeUserId != null;
+
+    final rows = await db.query(
+      'users',
+      where: hasExcludeUser
+          ? 'id != ? AND (LOWER(full_name) LIKE ? OR LOWER(user_name) LIKE ?)'
+          : 'LOWER(full_name) LIKE ? OR LOWER(user_name) LIKE ?',
+      whereArgs: hasExcludeUser
+          ? [excludeUserId, pattern, pattern]
+          : [pattern, pattern],
+      orderBy: 'LOWER(full_name) ASC, LOWER(user_name) ASC',
+      limit: limit,
+    );
+
+    return rows.map(UserDto.fromMap).toList();
+  }
 }

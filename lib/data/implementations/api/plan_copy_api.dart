@@ -112,6 +112,7 @@ class PlanCopyApi implements IPlanCopyApi {
   Future<int> acceptCopyRequest({
     required int requestId,
     required int targetUserId,
+    required DateTime newStartDate,
   }) async {
     final db = await _database.db;
     return db.transaction<int>((txn) async {
@@ -158,6 +159,7 @@ class PlanCopyApi implements IPlanCopyApi {
         sourceUserId: sourceUserId,
         targetUserId: targetUserId,
         createdAtIso: nowIso,
+        newStartDate: newStartDate,
       );
 
       await txn.update(
@@ -218,30 +220,42 @@ class PlanCopyApi implements IPlanCopyApi {
   // ─── Private helpers ─────────────────────────────────
 
   Future<Map<String, dynamic>?> _getPlan(
-    DatabaseExecutor db, int planId,
+    DatabaseExecutor db,
+    int planId,
   ) async {
     final rows = await db.query(
-      'plans', where: 'id = ?', whereArgs: [planId], limit: 1,
+      'plans',
+      where: 'id = ?',
+      whereArgs: [planId],
+      limit: 1,
     );
     if (rows.isEmpty) return null;
     return rows.first;
   }
 
   Future<Map<String, dynamic>?> _getUser(
-    DatabaseExecutor db, int userId,
+    DatabaseExecutor db,
+    int userId,
   ) async {
     final rows = await db.query(
-      'users', where: 'id = ?', whereArgs: [userId], limit: 1,
+      'users',
+      where: 'id = ?',
+      whereArgs: [userId],
+      limit: 1,
     );
     if (rows.isEmpty) return null;
     return rows.first;
   }
 
   Future<Map<String, dynamic>?> _getRequest(
-    DatabaseExecutor db, int requestId,
+    DatabaseExecutor db,
+    int requestId,
   ) async {
     final rows = await db.query(
-      'plan_copy_requests', where: 'id = ?', whereArgs: [requestId], limit: 1,
+      'plan_copy_requests',
+      where: 'id = ?',
+      whereArgs: [requestId],
+      limit: 1,
     );
     if (rows.isEmpty) return null;
     return rows.first;
@@ -295,9 +309,9 @@ class PlanCopyApi implements IPlanCopyApi {
     await txn.insert('notifications', {
       'user_id': targetUserId,
       'plan_id': null,
-      'title': 'Bạn có một lời mời nhận kế hoạch',
+      'title': 'Bạn có một lời mời nhận mẫu kế hoạch',
       'body':
-          '$senderName muốn chia sẻ cho bạn bản sao kế hoạch "${planName.isEmpty ? 'Không tên' : planName}".',
+          '$senderName muốn chia sẻ cho bạn mẫu kế hoạch "${planName.isEmpty ? 'Không tên' : planName}".',
       'is_read': 0,
       'type': 'SYSTEM',
       'event_key': null,

@@ -14,6 +14,7 @@ abstract class IPlanCopyApi {
   Future<int> acceptCopyRequest({
     required int requestId,
     required int targetUserId,
+    required DateTime newStartDate,
   });
 
   Future<void> rejectCopyRequest({

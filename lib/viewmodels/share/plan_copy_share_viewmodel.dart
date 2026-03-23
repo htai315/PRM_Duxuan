@@ -6,6 +6,7 @@ import 'package:du_xuan/domain/entities/user.dart';
 class PlanCopyShareViewModel extends ChangeNotifier {
   final IUserRepository _userRepository;
   final IPlanCopyRepository _planCopyRepository;
+  static const int _searchLimit = 20;
 
   PlanCopyShareViewModel({
     required IUserRepository userRepository,
@@ -13,38 +14,67 @@ class PlanCopyShareViewModel extends ChangeNotifier {
   }) : _userRepository = userRepository,
        _planCopyRepository = planCopyRepository;
 
-  List<User> _allUsers = [];
   List<User> _users = [];
   bool _isLoading = false;
   bool _isSubmitting = false;
+  bool _hasSearched = false;
   String? _errorMessage;
   String _query = '';
+  int? _excludeUserId;
 
   List<User> get users => _users;
   bool get isLoading => _isLoading;
   bool get isSubmitting => _isSubmitting;
+  bool get hasSearched => _hasSearched;
   String? get errorMessage => _errorMessage;
   String get query => _query;
 
   Future<void> loadRecipients({required int excludeUserId}) async {
-    _isLoading = true;
+    _excludeUserId = excludeUserId;
+    _users = [];
+    _query = '';
+    _hasSearched = false;
     _errorMessage = null;
-    notifyListeners();
-
-    try {
-      _allUsers = await _userRepository.getAll(excludeUserId: excludeUserId);
-      _applyFilter(_query);
-    } catch (e) {
-      _errorMessage = e.toString().replaceFirst('Exception: ', '');
-    }
-
-    _isLoading = false;
     notifyListeners();
   }
 
   void updateQuery(String value) {
     _query = value.trim();
-    _applyFilter(_query);
+    _errorMessage = null;
+    if (_query.isEmpty) {
+      _users = [];
+      _hasSearched = false;
+    }
+    notifyListeners();
+  }
+
+  Future<void> searchRecipients() async {
+    final normalizedQuery = _query.trim();
+    if (normalizedQuery.isEmpty) {
+      _users = [];
+      _hasSearched = false;
+      _errorMessage = null;
+      notifyListeners();
+      return;
+    }
+
+    _isLoading = true;
+    _hasSearched = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      _users = await _userRepository.search(
+        normalizedQuery,
+        excludeUserId: _excludeUserId,
+        limit: _searchLimit,
+      );
+    } catch (e) {
+      _users = [];
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+    }
+
+    _isLoading = false;
     notifyListeners();
   }
 
@@ -80,18 +110,5 @@ class PlanCopyShareViewModel extends ChangeNotifier {
     if (_errorMessage == null) return;
     _errorMessage = null;
     notifyListeners();
-  }
-
-  void _applyFilter(String query) {
-    if (query.isEmpty) {
-      _users = List<User>.from(_allUsers);
-      return;
-    }
-
-    final normalized = query.toLowerCase();
-    _users = _allUsers.where((user) {
-      return user.fullName.toLowerCase().contains(normalized) ||
-          user.userName.toLowerCase().contains(normalized);
-    }).toList();
   }
 }

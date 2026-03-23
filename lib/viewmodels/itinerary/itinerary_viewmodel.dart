@@ -270,6 +270,26 @@ class ItineraryViewModel extends ChangeNotifier {
     }
   }
 
+  Future<bool> deletePlan() async {
+    final plan = _plan;
+    if (plan == null) return false;
+
+    try {
+      await _planRepo.delete(plan.id);
+      await _notificationService.cancelPlanReminder(plan.id);
+      _plan = null;
+      _allActivitiesByDay = {};
+      _selectedDayIndex = 0;
+      _errorMessage = null;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<void> _syncPlanReminder(Plan plan) async {
     try {
       if (plan.status == PlanStatus.active) {

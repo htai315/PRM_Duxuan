@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:du_xuan/core/constants/app_colors.dart';
 import 'package:du_xuan/core/constants/app_text_styles.dart';
+import 'package:du_xuan/core/utils/app_feedback.dart';
 import 'package:du_xuan/core/utils/app_form_validators.dart';
 import 'package:du_xuan/core/utils/date_ui.dart';
 import 'package:du_xuan/viewmodels/plan/plan_form_viewmodel.dart';
@@ -41,6 +42,11 @@ class _PlanFormPageState extends State<PlanFormPage> {
   // Scroll tracking
   final ScrollController _scrollCtrl = ScrollController();
   bool _isScrolled = false;
+  bool _allowPop = false;
+  String _initialName = '';
+  String _initialDescription = '';
+  String _initialParticipants = '';
+  String _initialNote = '';
 
   @override
   void initState() {
@@ -51,11 +57,14 @@ class _PlanFormPageState extends State<PlanFormPage> {
     });
     if (widget.editPlanId != null) {
       _loadExisting();
+    } else {
+      _captureInitialState();
     }
   }
 
   Future<void> _loadExisting() async {
     await widget.viewModel.loadPlan(widget.editPlanId!);
+    if (!mounted) return;
     final plan = widget.viewModel.existingPlan;
     if (plan != null) {
       _nameCtrl.text = plan.name;
@@ -65,6 +74,7 @@ class _PlanFormPageState extends State<PlanFormPage> {
       setState(() {
         _startDate = plan.startDate;
         _endDate = plan.endDate;
+        _captureInitialState();
       });
     }
   }
@@ -83,53 +93,61 @@ class _PlanFormPageState extends State<PlanFormPage> {
   Widget build(BuildContext context) {
     final isEdit = widget.editPlanId != null;
 
-    return Scaffold(
-      extendBody: true,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [AppColors.bgWarm, AppColors.bgCream],
+    return PopScope(
+      canPop: !_shouldGuardExit,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _attemptClose();
+      },
+      child: Scaffold(
+        extendBody: true,
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [AppColors.bgWarm, AppColors.bgCream],
+            ),
           ),
-        ),
-        child: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              PlanFormAppBar(
-                title: isEdit ? 'Sửa kế hoạch' : 'Tạo kế hoạch mới',
-                isScrolled: _isScrolled,
-                onBack: () => Navigator.pop(context),
-              ),
-              Expanded(
-                child: ListenableBuilder(
-                  listenable: widget.viewModel,
-                  builder: (context, child) {
-                    if (widget.viewModel.isLoading &&
-                        widget.editPlanId != null &&
-                        widget.viewModel.existingPlan == null) {
-                      return const AppLoadingState(
-                        title: 'Đang tải kế hoạch',
-                        subtitle: 'Chuẩn bị dữ liệu để bạn chỉnh sửa kế hoạch.',
-                        icon: Icons.edit_note_rounded,
-                      );
-                    }
-                    return _buildForm();
-                  },
+          child: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                PlanFormAppBar(
+                  title: isEdit ? 'Sửa kế hoạch' : 'Tạo kế hoạch mới',
+                  isScrolled: _isScrolled,
+                  onBack: _attemptClose,
                 ),
-              ),
-            ],
+                Expanded(
+                  child: ListenableBuilder(
+                    listenable: widget.viewModel,
+                    builder: (context, child) {
+                      if (widget.viewModel.isLoading &&
+                          widget.editPlanId != null &&
+                          widget.viewModel.existingPlan == null) {
+                        return const AppLoadingState(
+                          title: 'Đang tải kế hoạch',
+                          subtitle:
+                              'Chuẩn bị dữ liệu để bạn chỉnh sửa kế hoạch.',
+                          icon: Icons.edit_note_rounded,
+                        );
+                      }
+                      return _buildForm();
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-      bottomNavigationBar: PlanFormBottomAction(
-        isDisabled: !_isFormValid || widget.viewModel.isLoading,
-        isLoading: widget.viewModel.isLoading,
-        isEdit: isEdit,
-        onSave: !_isFormValid || widget.viewModel.isLoading
-            ? null
-            : _handleSave,
+        bottomNavigationBar: PlanFormBottomAction(
+          isDisabled: !_isFormValid || widget.viewModel.isLoading,
+          isLoading: widget.viewModel.isLoading,
+          isEdit: isEdit,
+          onSave: !_isFormValid || widget.viewModel.isLoading
+              ? null
+              : _handleSave,
+        ),
       ),
     );
   }
@@ -297,6 +315,55 @@ class _PlanFormPageState extends State<PlanFormPage> {
   void _handleTextChanged(String _) {
     widget.viewModel.clearError();
     setState(() {});
+  }
+
+  void _captureInitialState() {
+    _initialName = _nameCtrl.text.trim();
+    _initialDescription = _descCtrl.text.trim();
+    _initialParticipants = _participantsCtrl.text.trim();
+    _initialNote = _noteCtrl.text.trim();
+  }
+
+  bool get _hasUnsavedChanges {
+    return _nameCtrl.text.trim() != _initialName ||
+        _descCtrl.text.trim() != _initialDescription ||
+        _participantsCtrl.text.trim() != _initialParticipants ||
+        _noteCtrl.text.trim() != _initialNote ||
+        _startDate != _baselineStartDate ||
+        _endDate != _baselineEndDate;
+  }
+
+  DateTime? get _baselineStartDate => widget.editPlanId != null
+      ? widget.viewModel.existingPlan?.startDate
+      : null;
+
+  DateTime? get _baselineEndDate => widget.editPlanId != null
+      ? widget.viewModel.existingPlan?.endDate
+      : null;
+
+  bool get _shouldGuardExit =>
+      !_allowPop && !widget.viewModel.isLoading && _hasUnsavedChanges;
+
+  Future<void> _attemptClose() async {
+    if (_allowPop) {
+      if (mounted) Navigator.pop(context);
+      return;
+    }
+    if (widget.viewModel.isLoading) {
+      return;
+    }
+    if (!_hasUnsavedChanges) {
+      if (mounted) Navigator.pop(context);
+      return;
+    }
+
+    final discard = await AppFeedback.showDiscardChangesDialog(
+      context: context,
+      message: 'Nếu thoát bây giờ, kế hoạch bạn đang nhập sẽ bị mất.',
+    );
+    if (!discard || !mounted) return;
+    setState(() => _allowPop = true);
+    Navigator.pop(context);
   }
 
   Widget _buildDateRangeBlock(int dayCount) {
@@ -476,6 +543,7 @@ class _PlanFormPageState extends State<PlanFormPage> {
       note: _noteCtrl.text,
     );
     if (result != null && mounted) {
+      setState(() => _allowPop = true);
       Navigator.pop(context, widget.editPlanId != null ? true : result.id);
     }
   }

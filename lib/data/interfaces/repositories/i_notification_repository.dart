@@ -6,8 +6,10 @@ abstract class INotificationRepository {
   Future<AppNotification?> getByEventKey(String eventKey);
   Future<AppNotification?> getById(int id);
   Future<AppNotification> create(AppNotification notification);
+  Future<void> deleteById(int id);
   Future<void> markAsRead(int id);
   Future<void> markAllAsRead(int userId);
+  Future<void> deleteAllVisibleByUserId(int userId);
   Future<void> deleteByPlanId(int planId);
   Future<void> deleteByEventKey(String eventKey);
   Future<void> deleteReminderByPlanId(int planId);

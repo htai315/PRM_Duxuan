@@ -71,6 +71,12 @@ class NotificationApi implements INotificationApi {
   }
 
   @override
+  Future<void> deleteById(int id) async {
+    final db = await _database.db;
+    await db.delete('notifications', where: 'id = ?', whereArgs: [id]);
+  }
+
+  @override
   Future<void> markAsRead(int id, String readAtIso) async {
     final db = await _database.db;
 
@@ -92,6 +98,18 @@ class NotificationApi implements INotificationApi {
       {'is_read': 1, 'read_at': readAtIso},
       where:
           'user_id = ? AND is_read = 0 AND (scheduled_at IS NULL OR scheduled_at <= ?)',
+      whereArgs: [userId, nowIso],
+    );
+  }
+
+  @override
+  Future<void> deleteAllVisibleByUserId(int userId) async {
+    final db = await _database.db;
+    final nowIso = DateTime.now().toIso8601String();
+
+    await db.delete(
+      'notifications',
+      where: 'user_id = ? AND (scheduled_at IS NULL OR scheduled_at <= ?)',
       whereArgs: [userId, nowIso],
     );
   }

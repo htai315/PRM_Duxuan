@@ -88,7 +88,7 @@ class PlanFormViewModel extends ChangeNotifier {
         endDate: validatedEndDate,
         participants: participants?.trim(),
         note: note?.trim(),
-        status: _existingPlan?.status ?? PlanStatus.active,
+        status: _resolvedStatus(),
         createdAt: _existingPlan?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
       );
@@ -123,5 +123,16 @@ class PlanFormViewModel extends ChangeNotifier {
     } catch (e) {
       debugPrint('Notification sync error (plan ${plan.id}): $e');
     }
+  }
+
+  PlanStatus _resolvedStatus() {
+    final existingStatus = _existingPlan?.status;
+    if (existingStatus == null) {
+      return PlanStatus.active;
+    }
+    if (existingStatus == PlanStatus.draft) {
+      return PlanStatus.active;
+    }
+    return existingStatus;
   }
 }

@@ -133,6 +133,23 @@ class AppFeedback {
     return result ?? false;
   }
 
+  static Future<bool> showDiscardChangesDialog({
+    required BuildContext context,
+    String title = 'Bỏ thay đổi chưa lưu?',
+    String message = 'Nếu thoát bây giờ, dữ liệu bạn vừa nhập sẽ bị mất.',
+    String confirmText = 'Thoát',
+    String cancelText = 'Ở lại',
+  }) {
+    return showConfirmDialog(
+      context: context,
+      title: title,
+      message: message,
+      confirmText: confirmText,
+      cancelText: cancelText,
+      destructive: true,
+    );
+  }
+
   static Color _backgroundColor(AppFeedbackType type) {
     switch (type) {
       case AppFeedbackType.success:

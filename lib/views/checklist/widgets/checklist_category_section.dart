@@ -60,29 +60,13 @@ class ChecklistCategorySection extends StatelessWidget {
               ),
               const SizedBox(width: 9),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      category.label,
-                      style: AppTextStyles.bodyLarge.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: catColor,
-                        fontSize: 15,
-                      ),
-                    ),
-                    const SizedBox(height: 1),
-                    Text(
-                      allPacked
-                          ? 'Tất cả vật dụng trong nhóm này đã sẵn sàng'
-                          : '$packedInCat/${items.length} vật dụng đã chuẩn bị',
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: AppColors.textLight,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  category.label,
+                  style: AppTextStyles.bodyLarge.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: catColor,
+                    fontSize: 15,
+                  ),
                 ),
               ),
               Container(

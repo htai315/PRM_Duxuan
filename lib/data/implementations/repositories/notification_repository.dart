@@ -62,6 +62,11 @@ class NotificationRepository implements INotificationRepository {
   }
 
   @override
+  Future<void> deleteById(int id) async {
+    await _api.deleteById(id);
+  }
+
+  @override
   Future<void> markAsRead(int id) async {
     await _api.markAsRead(id, DateTime.now().toIso8601String());
   }
@@ -69,6 +74,11 @@ class NotificationRepository implements INotificationRepository {
   @override
   Future<void> markAllAsRead(int userId) async {
     await _api.markAllAsRead(userId, DateTime.now().toIso8601String());
+  }
+
+  @override
+  Future<void> deleteAllVisibleByUserId(int userId) async {
+    await _api.deleteAllVisibleByUserId(userId);
   }
 
   @override

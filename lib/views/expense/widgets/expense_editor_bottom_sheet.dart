@@ -1,4 +1,5 @@
 import 'package:du_xuan/core/enums/expense_category.dart';
+import 'package:du_xuan/core/utils/app_feedback.dart';
 import 'package:du_xuan/core/utils/app_currency_input_formatter.dart';
 import 'package:du_xuan/core/utils/app_form_validators.dart';
 import 'package:du_xuan/domain/entities/activity.dart';
@@ -77,6 +78,13 @@ class _ExpenseEditorBottomSheetState extends State<ExpenseEditorBottomSheet> {
   int? _selectedActivityId;
   String? _nameError;
   String? _amountError;
+  bool _allowPop = false;
+  String _initialName = '';
+  String _initialAmount = '';
+  String _initialNote = '';
+  late ExpenseCategory _initialCategory;
+  int? _initialPlanDayId;
+  int? _initialActivityId;
 
   @override
   void initState() {
@@ -90,11 +98,18 @@ class _ExpenseEditorBottomSheetState extends State<ExpenseEditorBottomSheet> {
     _category = initial?.category ?? ExpenseCategory.other;
     _selectedPlanDayId = initial?.planDayId ?? widget.initialPlanDayId;
     _selectedActivityId = initial?.activityId;
+    _nameCtrl.addListener(_handleFieldChanged);
+    _amountCtrl.addListener(_handleFieldChanged);
+    _noteCtrl.addListener(_handleFieldChanged);
     _normalizeSelectedActivity();
+    _captureInitialState();
   }
 
   @override
   void dispose() {
+    _nameCtrl.removeListener(_handleFieldChanged);
+    _amountCtrl.removeListener(_handleFieldChanged);
+    _noteCtrl.removeListener(_handleFieldChanged);
     _nameCtrl.dispose();
     _amountCtrl.dispose();
     _noteCtrl.dispose();
@@ -108,31 +123,83 @@ class _ExpenseEditorBottomSheetState extends State<ExpenseEditorBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return ExpenseFormSheet(
-      title: widget.title,
-      nameCtrl: _nameCtrl,
-      amountCtrl: _amountCtrl,
-      noteCtrl: _noteCtrl,
-      nameError: _nameError,
-      amountError: _amountError,
-      category: _category,
-      selectedPlanDayId: _selectedPlanDayId,
-      selectedActivityId: _selectedActivityId,
-      days: widget.days,
-      availableActivities: _availableActivities,
-      onCategoryChanged: (value) => setState(() => _category = value),
-      onPlanDayChanged: (value) {
-        setState(() {
-          _selectedPlanDayId = value;
-          _normalizeSelectedActivity();
-        });
+    return PopScope(
+      canPop: !_shouldGuardExit,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _attemptClose();
       },
-      onActivityChanged: (value) => setState(() => _selectedActivityId = value),
-      onSave: _save,
-      saveLabel: widget.initialExpense == null
-          ? 'Lưu khoản chi'
-          : 'Cập nhật khoản chi',
+      child: ExpenseFormSheet(
+        title: widget.title,
+        nameCtrl: _nameCtrl,
+        amountCtrl: _amountCtrl,
+        noteCtrl: _noteCtrl,
+        nameError: _nameError,
+        amountError: _amountError,
+        category: _category,
+        selectedPlanDayId: _selectedPlanDayId,
+        selectedActivityId: _selectedActivityId,
+        days: widget.days,
+        availableActivities: _availableActivities,
+        onCategoryChanged: (value) => setState(() => _category = value),
+        onPlanDayChanged: (value) {
+          setState(() {
+            _selectedPlanDayId = value;
+            _normalizeSelectedActivity();
+          });
+        },
+        onActivityChanged: (value) =>
+            setState(() => _selectedActivityId = value),
+        onSave: _save,
+        saveLabel: widget.initialExpense == null
+            ? 'Lưu khoản chi'
+            : 'Cập nhật khoản chi',
+      ),
     );
+  }
+
+  void _handleFieldChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  void _captureInitialState() {
+    _initialName = _nameCtrl.text.trim();
+    _initialAmount = _amountCtrl.text.trim();
+    _initialNote = _noteCtrl.text.trim();
+    _initialCategory = _category;
+    _initialPlanDayId = _selectedPlanDayId;
+    _initialActivityId = _selectedActivityId;
+  }
+
+  bool get _hasUnsavedChanges {
+    return _nameCtrl.text.trim() != _initialName ||
+        _amountCtrl.text.trim() != _initialAmount ||
+        _noteCtrl.text.trim() != _initialNote ||
+        _category != _initialCategory ||
+        _selectedPlanDayId != _initialPlanDayId ||
+        _selectedActivityId != _initialActivityId;
+  }
+
+  bool get _shouldGuardExit => !_allowPop && _hasUnsavedChanges;
+
+  Future<void> _attemptClose() async {
+    if (_allowPop) {
+      if (mounted) Navigator.pop(context);
+      return;
+    }
+    if (!_hasUnsavedChanges) {
+      if (mounted) Navigator.pop(context);
+      return;
+    }
+
+    final discard = await AppFeedback.showDiscardChangesDialog(
+      context: context,
+      message: 'Nếu thoát bây giờ, khoản chi bạn đang nhập sẽ bị mất.',
+    );
+    if (!discard || !mounted) return;
+    setState(() => _allowPop = true);
+    Navigator.pop(context);
   }
 
   void _normalizeSelectedActivity() {
@@ -161,6 +228,7 @@ class _ExpenseEditorBottomSheetState extends State<ExpenseEditorBottomSheet> {
 
     if (_nameError != null || _amountError != null) return;
 
+    _allowPop = true;
     Navigator.pop(
       context,
       ExpenseEditorResult(

@@ -60,122 +60,139 @@ class _PlanCopyShareSheetState extends State<PlanCopyShareSheet> {
   void initState() {
     super.initState();
     widget.viewModel.loadRecipients(excludeUserId: widget.sourceUserId);
-    _searchCtrl.addListener(_handleSearchChanged);
   }
 
   @override
   void dispose() {
-    _searchCtrl
-      ..removeListener(_handleSearchChanged)
-      ..dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
     return AnimatedPadding(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOut,
       padding: EdgeInsets.only(bottom: bottomInset),
       child: SafeArea(
         top: false,
-        child: Container(
-          decoration: const BoxDecoration(
-            color: AppColors.bgWarm,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: ListenableBuilder(
-            listenable: widget.viewModel,
-            builder: (context, _) {
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 42,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: AppColors.divider,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final maxAvailableHeight = constraints.maxHeight.isFinite
+                ? constraints.maxHeight
+                : MediaQuery.sizeOf(context).height;
+            final computedHeight = maxAvailableHeight * 0.88;
+            final sheetHeight = computedHeight > 560
+                ? 560.0
+                : (computedHeight < 280 ? maxAvailableHeight : computedHeight);
+
+            return Align(
+              alignment: Alignment.bottomCenter,
+              child: SizedBox(
+                height: sheetHeight,
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: AppColors.bgWarm,
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(28),
                     ),
-                    const SizedBox(height: 14),
-                    Text(
-                      'Gửi lời mời nhận kế hoạch',
-                      style: AppTextStyles.titleMedium.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Tìm tài khoản muốn nhận bản sao kế hoạch. Người nhận sẽ thấy lời mời trong thông báo và có thể chấp nhận hoặc từ chối kế hoạch "${widget.planName}".',
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: AppColors.textMedium,
-                        height: 1.35,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    _buildSearchField(),
-                    const SizedBox(height: 12),
-                    SizedBox(height: 340, child: _buildBody()),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: AppActionChip(
-                            label: 'Đóng',
-                            onTap: widget.viewModel.isSubmitting
-                                ? null
-                                : () => Navigator.pop(context),
-                            textColor: AppColors.textMedium,
-                            backgroundColor: AppColors.white,
-                            borderColor: AppColors.divider.withValues(
-                              alpha: 0.85,
+                  ),
+                  child: ListenableBuilder(
+                    listenable: widget.viewModel,
+                    builder: (context, _) {
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Center(
+                              child: Container(
+                                width: 42,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: AppColors.divider,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                              ),
                             ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 11,
+                            const SizedBox(height: 14),
+                            Text(
+                              'Gửi lời mời nhận mẫu kế hoạch',
+                              style: AppTextStyles.titleMedium.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: AppActionChip(
-                            label: widget.viewModel.isSubmitting
-                                ? 'Đang gửi...'
-                                : 'Gửi lời mời',
-                            icon: Icons.outbox_rounded,
-                            onTap:
-                                _selectedUser == null ||
-                                    widget.viewModel.isLoading ||
-                                    widget.viewModel.isSubmitting
-                                ? null
-                                : _handleSubmit,
-                            textColor: Colors.white,
-                            gradient: const LinearGradient(
-                              colors: [
-                                AppColors.primary,
-                                AppColors.primaryDeep,
+                            const SizedBox(height: 4),
+                            Text(
+                              'Nhập tên hoặc tài khoản rồi bấm tìm. Khi chấp nhận, người nhận sẽ chọn ngày bắt đầu mới và hệ thống sẽ tạo một kế hoạch nháp từ "${widget.planName}".',
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.textMedium,
+                                height: 1.35,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            _buildSearchField(),
+                            const SizedBox(height: 12),
+                            Expanded(child: _buildBody()),
+                            const SizedBox(height: 14),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: AppActionChip(
+                                    label: 'Đóng',
+                                    onTap: widget.viewModel.isSubmitting
+                                        ? null
+                                        : () => Navigator.pop(context),
+                                    textColor: AppColors.textMedium,
+                                    backgroundColor: AppColors.white,
+                                    borderColor: AppColors.divider.withValues(
+                                      alpha: 0.85,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 11,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: AppActionChip(
+                                    label: widget.viewModel.isSubmitting
+                                        ? 'Đang gửi...'
+                                        : 'Gửi template',
+                                    icon: Icons.outbox_rounded,
+                                    onTap:
+                                        _selectedUser == null ||
+                                            widget.viewModel.isLoading ||
+                                            widget.viewModel.isSubmitting
+                                        ? null
+                                        : _handleSubmit,
+                                    textColor: Colors.white,
+                                    gradient: const LinearGradient(
+                                      colors: [
+                                        AppColors.primary,
+                                        AppColors.primaryDeep,
+                                      ],
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 11,
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 11,
-                            ),
-                          ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ],
+                      );
+                    },
+                  ),
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -191,6 +208,8 @@ class _PlanCopyShareSheetState extends State<PlanCopyShareSheet> {
       child: TextField(
         controller: _searchCtrl,
         textInputAction: TextInputAction.search,
+        onChanged: _handleSearchChanged,
+        onSubmitted: (_) => _performSearch(),
         decoration: InputDecoration(
           hintText: 'Tìm theo tên hoặc tài khoản',
           hintStyle: AppTextStyles.bodyMedium.copyWith(
@@ -200,6 +219,15 @@ class _PlanCopyShareSheetState extends State<PlanCopyShareSheet> {
             Icons.search_rounded,
             color: AppColors.primary,
             size: 20,
+          ),
+          suffixIcon: IconButton(
+            tooltip: 'Tìm',
+            onPressed: _performSearch,
+            icon: const Icon(
+              Icons.arrow_forward_rounded,
+              color: AppColors.primary,
+              size: 20,
+            ),
           ),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
@@ -214,10 +242,23 @@ class _PlanCopyShareSheetState extends State<PlanCopyShareSheet> {
   Widget _buildBody() {
     if (widget.viewModel.isLoading) {
       return const AppLoadingState(
-        title: 'Đang tải tài khoản',
-        subtitle: 'Chuẩn bị danh sách người nhận để bạn chọn nhanh.',
+        title: 'Đang tìm tài khoản',
+        subtitle: 'Đang tìm người nhận phù hợp cho lời mời này.',
         icon: Icons.people_alt_rounded,
         compact: true,
+      );
+    }
+
+    if (!widget.viewModel.hasSearched) {
+      return Center(
+        child: Text(
+          'Nhập tên hoặc tài khoản rồi bấm tìm để hiển thị kết quả.',
+          style: AppTextStyles.bodySmall.copyWith(
+            color: AppColors.textLight,
+            fontWeight: FontWeight.w600,
+          ),
+          textAlign: TextAlign.center,
+        ),
       );
     }
 
@@ -238,7 +279,7 @@ class _PlanCopyShareSheetState extends State<PlanCopyShareSheet> {
     if (widget.viewModel.users.isEmpty) {
       return Center(
         child: Text(
-          'Không tìm thấy tài khoản phù hợp để gửi kế hoạch.',
+          'Không tìm thấy tài khoản phù hợp với từ khóa này.',
           style: AppTextStyles.bodySmall.copyWith(
             color: AppColors.textLight,
             fontWeight: FontWeight.w600,
@@ -379,7 +420,26 @@ class _PlanCopyShareSheetState extends State<PlanCopyShareSheet> {
     );
   }
 
-  void _handleSearchChanged() {
-    widget.viewModel.updateQuery(_searchCtrl.text);
+  void _handleSearchChanged(String value) {
+    widget.viewModel.updateQuery(value);
+    if (_selectedUser != null) {
+      setState(() => _selectedUser = null);
+    }
+  }
+
+  Future<void> _performSearch() async {
+    FocusScope.of(context).unfocus();
+    await widget.viewModel.searchRecipients();
+    if (!mounted) return;
+
+    final currentSelection = _selectedUser;
+    if (currentSelection == null) return;
+
+    final stillExists = widget.viewModel.users.any(
+      (user) => user.id == currentSelection.id,
+    );
+    if (!stillExists) {
+      setState(() => _selectedUser = null);
+    }
   }
 }

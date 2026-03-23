@@ -60,6 +60,7 @@ class AppRoutes {
           builder: (args) => PlanDetailPage(
             viewModel: buildItineraryVM(),
             planId: args.planId,
+            successMessage: args.successMessage,
           ),
         );
       case activityCreate:

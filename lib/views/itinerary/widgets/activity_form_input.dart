@@ -13,6 +13,7 @@ class ActivityFormInput extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final Color iconColor;
   final List<TextInputFormatter>? inputFormatters;
+  final String? suffixText;
 
   const ActivityFormInput({
     super.key,
@@ -25,6 +26,7 @@ class ActivityFormInput extends StatelessWidget {
     this.isBorderless = false,
     this.onChanged,
     this.inputFormatters,
+    this.suffixText,
   });
 
   @override
@@ -50,6 +52,11 @@ class ActivityFormInput extends StatelessWidget {
           child: Icon(icon, color: iconColor, size: 20),
         ),
         prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+        suffixText: suffixText,
+        suffixStyle: AppTextStyles.bodyMedium.copyWith(
+          color: AppColors.textMedium,
+          fontWeight: FontWeight.w700,
+        ),
         border: InputBorder.none,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,

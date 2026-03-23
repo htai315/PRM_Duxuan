@@ -44,10 +44,12 @@ class PlanCopyRepository implements IPlanCopyRepository {
   Future<int> acceptCopyRequest({
     required int requestId,
     required int targetUserId,
+    required DateTime newStartDate,
   }) {
     return _api.acceptCopyRequest(
       requestId: requestId,
       targetUserId: targetUserId,
+      newStartDate: newStartDate,
     );
   }
 
