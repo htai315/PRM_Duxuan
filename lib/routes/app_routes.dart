@@ -61,6 +61,7 @@ class AppRoutes {
             viewModel: buildItineraryVM(),
             planId: args.planId,
             successMessage: args.successMessage,
+            initialTabIndex: args.initialTabIndex,
           ),
         );
       case activityCreate:

@@ -15,8 +15,13 @@ class PlanEditRouteArgs {
 class ItineraryRouteArgs {
   final int planId;
   final String? successMessage;
+  final int initialTabIndex;
 
-  const ItineraryRouteArgs({required this.planId, this.successMessage});
+  const ItineraryRouteArgs({
+    required this.planId,
+    this.successMessage,
+    this.initialTabIndex = 0,
+  });
 }
 
 class ActivityCreateRouteArgs {

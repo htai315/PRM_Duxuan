@@ -5,19 +5,21 @@ import 'package:du_xuan/core/utils/date_ui.dart';
 import 'package:du_xuan/core/enums/plan_status.dart';
 import 'package:du_xuan/core/enums/plan_timeline_state.dart';
 import 'package:du_xuan/domain/entities/plan.dart';
+import 'package:du_xuan/viewmodels/home/home_highlights_viewmodel.dart';
 import 'package:du_xuan/viewmodels/home/home_viewmodel.dart';
 import 'package:du_xuan/viewmodels/notification/notification_viewmodel.dart';
 import 'package:du_xuan/viewmodels/plan/plan_list_viewmodel.dart';
+import 'package:du_xuan/views/home/widgets/home_checklist_overview_card.dart';
 import 'package:du_xuan/views/home/widgets/profile_bottom_sheet.dart';
 
 class DashboardTab extends StatelessWidget {
   final HomeViewModel viewModel;
   final PlanListViewModel planListVM;
+  final HomeHighlightsViewModel highlightsVM;
   final NotificationViewModel notificationVM;
   final VoidCallback onCreatePlan;
   final Future<void> Function(int planId) onOpenPlanDetail;
-  final VoidCallback onOpenPlans;
-  final VoidCallback onOpenMap;
+  final Future<void> Function(int planId) onOpenChecklist;
   final VoidCallback onOpenNotifications;
   final VoidCallback onLogout;
 
@@ -25,11 +27,11 @@ class DashboardTab extends StatelessWidget {
     super.key,
     required this.viewModel,
     required this.planListVM,
+    required this.highlightsVM,
     required this.notificationVM,
     required this.onCreatePlan,
     required this.onOpenPlanDetail,
-    required this.onOpenPlans,
-    required this.onOpenMap,
+    required this.onOpenChecklist,
     required this.onOpenNotifications,
     required this.onLogout,
   });
@@ -53,8 +55,10 @@ class DashboardTab extends StatelessWidget {
       ),
       child: SafeArea(
         child: ListenableBuilder(
-          listenable: Listenable.merge([planListVM, notificationVM]),
+          listenable: Listenable.merge([planListVM, notificationVM, highlightsVM]),
           builder: (context, _) {
+            final primaryPlan = _findPrimaryPlan();
+            final hasPrimaryPlan = primaryPlan != null;
             return SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 26),
               child: Column(
@@ -62,14 +66,23 @@ class DashboardTab extends StatelessWidget {
                 children: [
                   _buildGreeting(context),
                   const SizedBox(height: 18),
-                  _sectionTitle('Hành trình gần nhất'),
+                  _sectionTitle('Kế hoạch nổi bật'),
                   const SizedBox(height: 10),
                   _buildUpcomingTrip(context),
-                  const SizedBox(height: 22),
-                  _sectionTitle('Tiện ích nhanh'),
-                  const SizedBox(height: 10),
-                  _buildQuickActions(),
-                  const SizedBox(height: 6),
+                  if (hasPrimaryPlan) ...[
+                    const SizedBox(height: 22),
+                    _sectionTitle('Đồ cần mang'),
+                    const SizedBox(height: 10),
+                    HomeChecklistOverviewCard(
+                      isLoading: highlightsVM.isLoading,
+                      packedCount: highlightsVM.checklistPackedCount,
+                      totalCount: highlightsVM.checklistTotalCount,
+                      remainingItems: highlightsVM.remainingChecklistPreview,
+                      onTap: () => onOpenChecklist(primaryPlan.id),
+                    ),
+                    const SizedBox(height: 22),
+                    _buildCreatePlanAction(),
+                  ],
                 ],
               ),
             );
@@ -288,23 +301,40 @@ class DashboardTab extends StatelessWidget {
   }
 
   Widget _buildUpcomingTrip(BuildContext context) {
-    final plans = planListVM.plans;
-
-    Plan? upcomingPlan;
-    for (final p in plans) {
-      if (p.status != PlanStatus.active) continue;
-      if (p.timelineState == PlanTimelineState.pastDue) continue;
-      if (upcomingPlan == null ||
-          p.startDate.isBefore(upcomingPlan.startDate)) {
-        upcomingPlan = p;
-      }
-    }
-
+    final upcomingPlan = _findPrimaryPlan();
     if (upcomingPlan == null) {
       return _buildEmptyUpcoming();
     }
 
     return _buildUpcomingCard(context, upcomingPlan);
+  }
+
+  Plan? _findPrimaryPlan() {
+    final plans = planListVM.plans;
+
+    Plan? ongoingPlan;
+    for (final plan in plans) {
+      if (plan.status != PlanStatus.active) continue;
+      if (plan.timelineState != PlanTimelineState.ongoing) continue;
+
+      if (ongoingPlan == null || plan.startDate.isBefore(ongoingPlan.startDate)) {
+        ongoingPlan = plan;
+      }
+    }
+    if (ongoingPlan != null) return ongoingPlan;
+
+    Plan? upcomingPlan;
+    for (final plan in plans) {
+      if (plan.status != PlanStatus.active) continue;
+      if (plan.timelineState != PlanTimelineState.upcoming) continue;
+
+      if (upcomingPlan == null ||
+          plan.startDate.isBefore(upcomingPlan.startDate)) {
+        upcomingPlan = plan;
+      }
+    }
+
+    return upcomingPlan;
   }
 
   Widget _buildEmptyUpcoming() {
@@ -540,51 +570,15 @@ class DashboardTab extends StatelessWidget {
     );
   }
 
-  Widget _buildQuickActions() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: SizedBox(
-                height: 112,
-                child: _quickActionCard(
-                  icon: Icons.add_rounded,
-                  title: 'Tạo kế hoạch',
-                  subtitle: 'Tạo mới',
-                  color: AppColors.primary,
-                  onTap: onCreatePlan,
-                  minHeight: 112,
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: SizedBox(
-                height: 112,
-                child: _quickActionCard(
-                  icon: Icons.luggage_rounded,
-                  title: 'Kế hoạch của tôi',
-                  subtitle: 'Xem tất cả',
-                  color: AppColors.primaryDeep,
-                  onTap: onOpenPlans,
-                  minHeight: 112,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        _quickActionCard(
-          icon: Icons.map_rounded,
-          title: 'Bản đồ hành trình',
-          subtitle: 'Xem nhanh điểm đến đã thêm',
-          color: AppColors.goldDeep,
-          onTap: onOpenMap,
-          fullWidth: true,
-          minHeight: 92,
-        ),
-      ],
+  Widget _buildCreatePlanAction() {
+    return _quickActionCard(
+      icon: Icons.add_rounded,
+      title: 'Tạo kế hoạch mới',
+      subtitle: 'Bắt đầu chuyến đi mới với lịch trình, checklist và chi tiêu',
+      color: AppColors.primary,
+      onTap: onCreatePlan,
+      fullWidth: true,
+      minHeight: 96,
     );
   }
 

@@ -32,12 +32,14 @@ class PlanDetailPage extends StatefulWidget {
   final ItineraryViewModel viewModel;
   final int planId;
   final String? successMessage;
+  final int initialTabIndex;
 
   const PlanDetailPage({
     super.key,
     required this.viewModel,
     required this.planId,
     this.successMessage,
+    this.initialTabIndex = 0,
   });
 
   @override
@@ -55,7 +57,11 @@ class _PlanDetailPageState extends State<PlanDetailPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(
+      length: 4,
+      vsync: this,
+      initialIndex: widget.initialTabIndex.clamp(0, 3),
+    );
     _checklistVM = buildChecklistVM();
     _expenseVM = buildExpenseVM();
     _publicShareVM = buildPublicShareVM();

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:du_xuan/core/constants/app_colors.dart';
 import 'package:du_xuan/core/constants/app_text_styles.dart';
+import 'package:du_xuan/core/enums/plan_status.dart';
+import 'package:du_xuan/core/enums/plan_timeline_state.dart';
 import 'package:du_xuan/core/utils/app_feedback.dart';
 import 'package:du_xuan/core/utils/notification_service.dart';
 import 'package:du_xuan/di.dart';
+import 'package:du_xuan/domain/entities/plan.dart';
 import 'package:du_xuan/routes/app_routes.dart';
 import 'package:du_xuan/routes/route_args.dart';
 import 'package:du_xuan/viewmodels/home/home_viewmodel.dart';
@@ -25,6 +28,7 @@ class _HomePageState extends State<HomePage> {
   late final NotificationService _notificationService =
       buildNotificationService();
   late final _mapVM = buildMapVM();
+  late final _highlightsVM = buildHomeHighlightsVM();
 
   int? get _currentUserId => widget.viewModel.session?.user.id;
 
@@ -47,9 +51,13 @@ class _HomePageState extends State<HomePage> {
     bool forceMapReload = false,
   }) async {
     final userId = _currentUserId;
-    if (userId == null || userId <= 0) return;
+    if (userId == null || userId <= 0) {
+      await _highlightsVM.loadForPlan(null);
+      return;
+    }
 
     await _planListVM.loadPlans(userId, refresh: true);
+    await _highlightsVM.loadForPlan(_findPrimaryPlan(_planListVM.plans));
     if (syncReminders) {
       await _notificationService.syncPlanReminders(_planListVM.plans);
     }
@@ -82,13 +90,18 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _openPlanDetail(int planId, {String? successMessage}) async {
+  Future<void> _openPlanDetail(
+    int planId, {
+    String? successMessage,
+    int initialTabIndex = 0,
+  }) async {
     final result = await Navigator.pushNamed(
       context,
       AppRoutes.itinerary,
       arguments: ItineraryRouteArgs(
         planId: planId,
         successMessage: successMessage,
+        initialTabIndex: initialTabIndex,
       ),
     );
     if (!mounted) return;
@@ -123,6 +136,7 @@ class _HomePageState extends State<HomePage> {
     _planListVM.dispose();
     _notificationVM.dispose();
     _mapVM.dispose();
+    _highlightsVM.dispose();
     super.dispose();
   }
 
@@ -139,11 +153,12 @@ class _HomePageState extends State<HomePage> {
               DashboardTab(
                 viewModel: widget.viewModel,
                 planListVM: _planListVM,
+                highlightsVM: _highlightsVM,
                 notificationVM: _notificationVM,
                 onCreatePlan: _navigateToCreatePlan,
                 onOpenPlanDetail: _openPlanDetail,
-                onOpenPlans: () => _onTabChanged(1),
-                onOpenMap: () => _onTabChanged(2),
+                onOpenChecklist: (planId) =>
+                    _openPlanDetail(planId, initialTabIndex: 1),
                 onOpenNotifications: _navigateToNotifications,
                 onLogout: _handleLogout,
               ),
@@ -192,7 +207,7 @@ class _HomePageState extends State<HomePage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              Expanded(child: _navItem(0, Icons.home_rounded, 'Khám phá')),
+              Expanded(child: _navItem(0, Icons.home_rounded, 'Trang chủ')),
               Expanded(child: _navItem(1, Icons.luggage_rounded, 'Chuyến đi')),
               Expanded(child: _navItem(2, Icons.map_rounded, 'Bản đồ')),
             ],
@@ -200,6 +215,32 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+  }
+
+  Plan? _findPrimaryPlan(List<Plan> plans) {
+    Plan? ongoingPlan;
+    for (final plan in plans) {
+      if (plan.status != PlanStatus.active) continue;
+      if (plan.timelineState != PlanTimelineState.ongoing) continue;
+
+      if (ongoingPlan == null || plan.startDate.isBefore(ongoingPlan.startDate)) {
+        ongoingPlan = plan;
+      }
+    }
+    if (ongoingPlan != null) return ongoingPlan;
+
+    Plan? upcomingPlan;
+    for (final plan in plans) {
+      if (plan.status != PlanStatus.active) continue;
+      if (plan.timelineState != PlanTimelineState.upcoming) continue;
+
+      if (upcomingPlan == null ||
+          plan.startDate.isBefore(upcomingPlan.startDate)) {
+        upcomingPlan = plan;
+      }
+    }
+
+    return upcomingPlan;
   }
 
   Widget _navItem(int index, IconData icon, String label) {

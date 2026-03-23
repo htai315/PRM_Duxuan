@@ -42,6 +42,7 @@ import 'package:du_xuan/viewmodels/checklist/checklist_viewmodel.dart';
 import 'package:du_xuan/viewmodels/checklist/suggestion_viewmodel.dart';
 import 'package:du_xuan/viewmodels/expense/expense_viewmodel.dart';
 import 'package:du_xuan/viewmodels/home/home_viewmodel.dart';
+import 'package:du_xuan/viewmodels/home/home_highlights_viewmodel.dart';
 import 'package:du_xuan/viewmodels/itinerary/activity_form_viewmodel.dart';
 import 'package:du_xuan/viewmodels/itinerary/itinerary_viewmodel.dart';
 import 'package:du_xuan/viewmodels/login/login_viewmodel.dart';
@@ -76,6 +77,9 @@ LoginViewModel buildLoginVM() => LoginViewModel(_buildAuthRepository());
 RegisterViewModel buildRegisterVM() =>
     RegisterViewModel(_buildAuthRepository());
 HomeViewModel buildHomeVM() => HomeViewModel(_buildAuthRepository());
+HomeHighlightsViewModel buildHomeHighlightsVM() => HomeHighlightsViewModel(
+  checklistRepository: _buildChecklistRepository(),
+);
 ChangePasswordViewModel buildChangePasswordVM() =>
     ChangePasswordViewModel(_buildAuthRepository());
 
